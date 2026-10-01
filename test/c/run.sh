@@ -1,0 +1,14 @@
+#!/bin/sh
+# Prüft den C-Code gegen den Stub-Header (Syntax für alle Plattformen) und testet die Logik nativ.
+set -e
+cd "$(dirname "$0")/../.."
+FLAGS="-std=gnu99 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-field-initializers -Itest/c/stub"
+for defs in "-DPBL_COLOR -DPBL_PLATFORM_EMERY" "-DPBL_COLOR -DPBL_PLATFORM_BASALT" "-DPBL_BW -DPBL_PLATFORM_DIORITE"; do
+  gcc $FLAGS -fsyntax-only $defs src/c/*.c
+done
+echo "Syntax ok (emery, basalt, diorite)"
+OUT=$(mktemp)
+gcc -std=gnu99 -Wall -Itest/c/stub -DPBL_COLOR -Dtime=fake_time \
+  test/c/logic_test.c src/c/events.c src/c/settings.c -o "$OUT"
+"$OUT"
+rm -f "$OUT"
