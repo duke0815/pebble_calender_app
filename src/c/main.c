@@ -312,7 +312,10 @@ static void prv_touch_handler(const TouchEvent *event, void *context) {
   switch (event->type) {
     case TouchEvent_Touchdown:
       s_finger_down = true;
-      s_touch_active = !event->non_navigational;
+      // Nur Gesten, die in der Tagesansicht beginnen, wechseln den Tag. Wichtig: Die
+      // Touch-Navigation des Systems sieht das Abheben vor uns und schließt bei "rechts
+      // wischen" die Detailansicht – beim Abheben läge dann schon die Tagesansicht oben.
+      s_touch_active = !event->non_navigational && ui_main_is_top();
       s_touch_x = event->x;
       s_touch_y = event->y;
       return;
@@ -333,8 +336,8 @@ static void prv_touch_handler(const TouchEvent *event, void *context) {
   int adx = dx < 0 ? -dx : dx;
   int ady = dy < 0 ? -dy : dy;
   prv_interaction();
-  if (adx < SWIPE_MIN_PX || adx <= ady || !ui_main_is_top()) {
-    return;  // Tippen/vertikal: macht das System; Detail-/Login-Fenster: nichts
+  if (adx < SWIPE_MIN_PX || adx <= ady) {
+    return;  // Tippen/vertikal: macht das System
   }
   prv_change_day(dx < 0 ? 1 : -1);  // nach links wischen = nächster Tag
 }
