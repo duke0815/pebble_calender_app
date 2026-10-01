@@ -1,5 +1,5 @@
-// Clay-Konfiguration – wird bei jedem Öffnen der Einstellungen neu aufgebaut,
-// damit die Kalenderliste aktuell ist (siehe CLAUDE.md).
+// Clay configuration - rebuilt every time the settings are opened
+// so that the calendar list is up to date (see CLAUDE.md).
 
 var lib = require('./lib');
 var i18n = require('./i18n');
@@ -23,7 +23,7 @@ function colorItem(key, label, value, description) {
   return item;
 }
 
-// calendars: [{id, name, isDefaultCalendar}], settings: siehe lib.DEFAULT_SETTINGS
+// calendars: [{id, name, isDefaultCalendar}], settings: see lib.DEFAULT_SETTINGS
 function buildConfig(calendars, settings, loggedIn) {
   var calendarItem;
   if (calendars.length) {
@@ -45,7 +45,7 @@ function buildConfig(calendars, settings, loggedIn) {
   }
 
   return [
-    { type: 'heading', defaultValue: 'Kalender für Office 365' },
+    { type: 'heading', defaultValue: 'Calendar for Office 365' },
     {
       type: 'section',
       items: [
@@ -74,6 +74,19 @@ function buildConfig(calendars, settings, loggedIn) {
           label: t('cfgTouch'),
           description: t('cfgTouchDesc'),
           defaultValue: settings.touch
+        },
+        {
+          type: 'select',
+          messageKey: 'CFG_AUTO_CLOSE',
+          label: t('cfgAutoClose'),
+          description: t('cfgAutoCloseDesc'),
+          defaultValue: String(settings.autoClose),
+          options: [
+            { label: t('cfgAutoCloseNever'), value: '0' },
+            { label: t('cfgAutoClose2'), value: '2' },
+            { label: t('cfgAutoClose5'), value: '5' },
+            { label: t('cfgAutoClose10'), value: '10' }
+          ]
         },
         {
           type: 'toggle',
@@ -181,7 +194,7 @@ function buildConfig(calendars, settings, loggedIn) {
   ];
 }
 
-// Wert eines Clay-Ergebnisses ({key: {value: x}} oder {key: x})
+// Value from a Clay result ({key: {value: x}} or {key: x})
 function value(result, key, fallback) {
   if (!result || !result.hasOwnProperty(key)) return fallback;
   var v = result[key];
@@ -189,14 +202,14 @@ function value(result, key, fallback) {
   return v === undefined || v === null ? fallback : v;
 }
 
-// Clay liefert Farben als Zahl (0xRRGGBB), ältere Versionen ggf. als Hex-String
+// Clay returns colors as a number (0xRRGGBB), older versions possibly as a hex string
 function colorValue(v, fallback) {
   if (v === null || v === undefined || v === '') return fallback;
   var n = typeof v === 'number' ? v : parseInt(String(v).replace(/^#|^0x/i, ''), 16);
   return isNaN(n) ? fallback : (n & 0xFFFFFF);
 }
 
-// Überträgt das Clay-Ergebnis in unsere Settings. Gibt {settings, logout} zurück.
+// Applies the Clay result to our settings. Returns {settings, logout}.
 function applyResult(result, calendars, settings) {
   var next = lib.mergeSettings(settings);
 
@@ -208,6 +221,7 @@ function applyResult(result, calendars, settings) {
   next.showAllDay = !!value(result, 'CFG_ALLDAY', next.showAllDay);
   next.touch = !!value(result, 'CFG_TOUCH', next.touch);
   next.grayPast = !!value(result, 'CFG_GRAY_PAST', next.grayPast);
+  next.autoClose = lib.autoCloseMinutes(value(result, 'CFG_AUTO_CLOSE', next.autoClose));
   next.moveEnabled = !!value(result, 'CFG_MOVE', next.moveEnabled);
   next.moveScope = value(result, 'CFG_MOVE_SCOPE', next.moveScope) === 'own' ? 'own' : 'solo';
   var moveOpts = value(result, 'CFG_MOVE_OPTS', null);

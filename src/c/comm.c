@@ -54,6 +54,8 @@ static void prv_handle_settings(DictionaryIterator *iter) {
   s->lang = prv_int(iter, MESSAGE_KEY_SET_LANG, s->lang) == LANG_EN ? LANG_EN : LANG_DE;
   s->touch_off = prv_int(iter, MESSAGE_KEY_SET_TOUCH, !s->touch_off) ? 0 : 1;
   s->gray_past = prv_int(iter, MESSAGE_KEY_SET_GRAY_PAST, s->gray_past) ? 1 : 0;
+  int auto_close = prv_int(iter, MESSAGE_KEY_SET_AUTO_CLOSE, s->auto_close_min);
+  s->auto_close_min = (auto_close < 0 || auto_close > 60) ? 5 : auto_close;
   s->move_opts = prv_int(iter, MESSAGE_KEY_SET_MOVE_OPTS, s->move_opts) & ((1 << MOVE_OPT_COUNT) - 1);
   s->color_accent = (uint32_t)prv_int(iter, MESSAGE_KEY_SET_COLOR_ACCENT, s->color_accent) & 0xFFFFFF;
   s->color_text = (uint32_t)prv_int(iter, MESSAGE_KEY_SET_COLOR_TEXT, s->color_text) & 0xFFFFFF;

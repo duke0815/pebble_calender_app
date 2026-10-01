@@ -1,6 +1,7 @@
 #include "settings.h"
 #include "events.h"
 #include "i18n.h"
+#include <stddef.h>
 
 #define PERSIST_KEY_SETTINGS 4
 #define WAKEUP_COOKIE_BRIEFING 1
@@ -13,19 +14,21 @@ static void prv_defaults(void) {
     .brief_enabled = 0,
     .brief_hour = 7,
     .brief_minute = 0,
-    .brief_days = 0x3E,  // Mo-Fr
+    .brief_days = 0x3E,  // Mon-Fri
     .lang = i18n_default_lang(),
-    .color_accent = 0x0055AA,  // Kobaltblau
+    .color_accent = 0x0055AA,  // cobalt blue
     .color_text = 0x000000,
     .color_bg = 0xFFFFFF,
+    .auto_close_min = 5,
   };
 }
 
 void settings_load(void) {
   prv_defaults();
   if (persist_exists(PERSIST_KEY_SETTINGS)) {
-    Settings stored;
-    if (persist_read_data(PERSIST_KEY_SETTINGS, &stored, sizeof(stored)) == (int)sizeof(stored)) {
+    // Older versions stored a shorter struct: newer fields keep their defaults.
+    Settings stored = s_settings;
+    if (persist_read_data(PERSIST_KEY_SETTINGS, &stored, sizeof(stored)) >= (int)offsetof(Settings, auto_close_min)) {
       s_settings = stored;
     }
   }
@@ -39,7 +42,7 @@ Settings *settings_get(void) {
   return &s_settings;
 }
 
-// Naechster Zeitpunkt > now mit passender Uhrzeit und erlaubtem Wochentag.
+// Next time > now with matching time of day and an allowed weekday.
 static time_t prv_next_briefing(time_t now) {
   for (int day = 0; day <= 7; day++) {
     time_t candidate = time_make_local(now, day, s_settings.brief_hour, s_settings.brief_minute);
@@ -73,7 +76,7 @@ void settings_schedule_wakeup(void) {
       APP_LOG(APP_LOG_LEVEL_ERROR, "wakeup_schedule fehlgeschlagen: %d", (int)id);
       return;
     }
-    // Ein anderer Wakeup liegt zu nah dran -> eine Minute spaeter versuchen.
+    // Another wakeup is too close -> try one minute later.
     when += 60;
   }
   APP_LOG(APP_LOG_LEVEL_ERROR, "Briefing konnte nicht geplant werden");

@@ -1,5 +1,5 @@
 #
-# Standard-Buildskript des Pebble SDK.
+# Standard Pebble SDK build script.
 #
 import os.path
 

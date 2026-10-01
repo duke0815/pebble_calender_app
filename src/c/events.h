@@ -3,40 +3,40 @@
 #include "protocol.h"
 
 typedef struct {
-  int32_t start;          // Epoch-Sekunden (ganztaegig: lokale Mitternacht)
-  int32_t end;            // Epoch-Sekunden (ganztaegig: exklusive lokale Mitternacht)
-  int32_t key;            // Kennung für die Beschreibung (0 = keine)
+  int32_t start;          // epoch seconds (all-day: local midnight)
+  int32_t end;            // epoch seconds (all-day: exclusive local midnight)
+  int32_t key;            // key for the description (0 = none)
   uint8_t all_day;
   uint8_t flags;          // EVT_FLAG_*
   char title[TITLE_LEN];
   char location[LOCATION_LEN];
 } CalEvent;
 
-// Cache (heute + morgen, persistent)
+// Cache (today + tomorrow, persistent)
 void events_load_cache(void);
 time_t events_last_sync(void);
 
-// Empfang einer Liste: Termine einzeln, dann commit.
+// Receiving a list: events one by one, then commit.
 void events_receive(int index, const CalEvent *event);
-// Übernimmt die empfangene Liste, wenn vollständig. list_day = lokale Mitternacht des
-// ersten Tages, list_days = Anzahl Tage. Listen mit >= 2 Tagen ersetzen den Cache,
-// 1-Tages-Listen landen im Tagespuffer (nur RAM) – aber nur für den gerade angezeigten Tag.
-// Gibt true zurück, wenn übernommen.
+// Applies the received list if complete. list_day = local midnight of the
+// first day, list_days = number of days. Lists with >= 2 days replace the cache,
+// 1-day lists go into the day buffer (RAM only) - but only for the currently displayed day.
+// Returns true if applied.
 bool events_commit(int count, time_t list_day, int list_days);
 
-// Ansicht: genau ein Tag
+// View: exactly one day
 void events_set_view_day(time_t day);
 time_t events_view_day(void);
-// Tagespuffer verwerfen (z. B. nach dem Verschieben eines Termins)
+// Discard the day buffer (e.g. after moving an event)
 void events_invalidate_day(void);
-// true, wenn für den angezeigten Tag Daten vorliegen (Cache oder Tagespuffer)
+// true if data is available for the displayed day (cache or day buffer)
 bool events_view_available(void);
 void events_rebuild_view(void);
 uint16_t events_view_count(void);
 const CalEvent *events_view_get(uint16_t row);
-// Zeile des ersten noch nicht beendeten Termins; false, wenn keiner.
+// Row of the first event that has not ended yet; false if none.
 bool events_view_first_upcoming(uint16_t *row);
 
 time_t time_day_start(time_t t);
-// Lokale Uhrzeit hour:minute am Tag von base + day_offset (robust bei Zeitumstellung)
+// Local time hour:minute on the day of base + day_offset (robust across DST changes)
 time_t time_make_local(time_t base, int day_offset, int hour, int minute);

@@ -5,6 +5,7 @@
 #include "i18n.h"
 #include "settings.h"
 #include "theme.h"
+#include "idle.h"
 
 #if defined(PBL_PLATFORM_EMERY)
   #define FONT_TEXT FONT_KEY_GOTHIC_24_BOLD
@@ -30,11 +31,11 @@ static int s_option_count;
 static int s_chosen;
 static char s_targets[MOVE_OPT_COUNT][32];
 
-// Auswahl
+// Selection
 static Window *s_menu_window;
 static MenuLayer *s_menu;
 
-// Bestätigung / Ergebnis
+// Confirmation / result
 static Window *s_confirm_window;
 static TextLayer *s_text_layer;
 static TextLayer *s_hint_layer;
@@ -47,7 +48,7 @@ static AppTimer *s_timeout;
 static AppTimer *s_close_timer;
 
 // ---------------------------------------------------------------------------
-// Ziel berechnen (wie lib.shiftEvent: Tage behalten die lokale Uhrzeit)
+// Compute the target (like lib.shiftEvent: days keep the local time of day)
 
 static bool prv_option_fits(int opt) {
   if (!(settings_get()->move_opts & (1 << opt))) return false;
@@ -60,7 +61,7 @@ static time_t prv_target_start(int opt) {
   struct tm *tm = localtime(&start);
   int days;
   if (opt == MOVE_OPT_MONDAY) {
-    days = ((1 - tm->tm_wday + 6) % 7) + 1;  // 1..7 Tage bis zum nächsten Montag
+    days = ((1 - tm->tm_wday + 6) % 7) + 1;  // 1..7 days until next Monday
   } else {
     days = opt == MOVE_OPT_DAY ? 1 : (opt == MOVE_OPT_2DAYS ? 2 : 7);
   }
@@ -92,7 +93,7 @@ bool ui_move_available(const CalEvent *event) {
 
 const char *ui_move_reason(const CalEvent *event) {
   if (ui_move_available(event)) return NULL;
-  if (!(event->flags & EVT_FLAG_MOVE_ENABLED)) return NULL;  // Funktion aus: kein Hinweis
+  if (!(event->flags & EVT_FLAG_MOVE_ENABLED)) return NULL;  // feature off: no hint
   if (settings_get()->move_opts == 0) return tr(STR_MOVE_NO_SETTINGS);
   if (event->flags & EVT_FLAG_NOT_ORGANIZER) return tr(STR_MOVE_NOT_ORGANIZER);
   if (event->flags & EVT_FLAG_HAS_ATTENDEES) return tr(STR_MOVE_HAS_ATTENDEES);
@@ -100,7 +101,7 @@ const char *ui_move_reason(const CalEvent *event) {
 }
 
 // ---------------------------------------------------------------------------
-// Bestätigung, Senden, Ergebnis
+// Confirmation, sending, result
 
 static void prv_cancel_timers(void) {
   if (s_send_timer) { app_timer_cancel(s_send_timer); s_send_timer = NULL; }
@@ -139,6 +140,7 @@ static void prv_send(void *data) {
 }
 
 static void prv_confirm_select(ClickRecognizerRef recognizer, void *context) {
+  idle_kick();
   if (s_sending || s_done) return;
   if (!connection_service_peek_pebble_app_connection()) {
     s_done = true;
@@ -153,7 +155,7 @@ static void prv_confirm_select(ClickRecognizerRef recognizer, void *context) {
 }
 
 static void prv_confirm_back(ClickRecognizerRef recognizer, void *context) {
-  if (s_sending) return;  // während des Sendens nicht abbrechen
+  if (s_sending) return;  // do not cancel while sending
   window_stack_remove(s_confirm_window, true);
 }
 
@@ -166,7 +168,7 @@ static void prv_confirm_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(root);
   int16_t w = bounds.size.w - 2 * PAD;
-  int16_t hint_h = 44;  // zwei Zeilen Hinweis
+  int16_t hint_h = 44;  // two lines of hint
 
   s_text_layer = text_layer_create(GRect(PAD, PAD, w, bounds.size.h - hint_h - 2 * PAD));
   text_layer_set_text(s_text_layer, s_text);
@@ -230,7 +232,7 @@ void ui_move_result(int32_t key, bool ok, const char *text) {
 }
 
 // ---------------------------------------------------------------------------
-// Auswahl
+// Selection
 
 static uint16_t prv_num_rows(MenuLayer *menu, uint16_t section, void *ctx) {
   return s_option_count;
@@ -249,7 +251,12 @@ static void prv_draw_row(GContext *ctx, const Layer *cell, MenuIndex *index, voi
   menu_cell_basic_draw(ctx, cell, tr(OPTION_LABELS[opt]), s_targets[opt], NULL);
 }
 
+static void prv_selection_changed(MenuLayer *menu, MenuIndex new_index, MenuIndex old_index, void *data) {
+  idle_kick();
+}
+
 static void prv_select(MenuLayer *menu, MenuIndex *index, void *data) {
+  idle_kick();
   prv_show_confirm(s_options[index->row]);
 }
 
@@ -262,6 +269,7 @@ static void prv_menu_load(Window *window) {
     .draw_header = prv_draw_header,
     .draw_row = prv_draw_row,
     .select_click = prv_select,
+    .selection_changed = prv_selection_changed,
   });
   menu_layer_set_normal_colors(s_menu, theme_bg(), theme_text());
   menu_layer_set_highlight_colors(s_menu, theme_accent(), theme_on_accent());

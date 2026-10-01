@@ -1,5 +1,5 @@
-// PebbleKit JS: Anmeldung (Device Code Flow), Microsoft Graph, Übertragung an die Uhr.
-// Kein eigener Server – Tokens bleiben im localStorage des Handys.
+// PebbleKit JS: sign-in (device code flow), Microsoft Graph, transfer to the watch.
+// No server of our own - tokens stay in the phone's localStorage.
 
 var Clay = require('pebble-clay');
 var messageKeys = require('message_keys');
@@ -7,14 +7,14 @@ var lib = require('./lib');
 var i18n = require('./i18n');
 var configPage = require('./config');
 
-// --- Konfiguration ----------------------------------------------------------
-// Client-ID der Entra-App-Registrierung (siehe README.md).
+// --- Configuration ----------------------------------------------------------
+// Client ID of the Entra app registration (see README.md).
 var CLIENT_ID = '402716d7-8b06-443b-af50-c37348a787c4';
-// 'common' = alle Kontotypen; für Eigengebrauch kann hier die eigene Tenant-ID stehen.
+// 'common' = all account types; for personal use this can be your own tenant ID.
 var AUTHORITY = 'common';
 
 var SCOPE_READ = 'https://graph.microsoft.com/Calendars.Read offline_access';
-// Nur wenn "Termine verschieben" eingeschaltet ist (inkrementelle Zustimmung)
+// Only when "Move events" is enabled (incremental consent)
 var SCOPE_RW = 'https://graph.microsoft.com/Calendars.ReadWrite offline_access';
 var LOGIN_BASE = 'https://login.microsoftonline.com/' + AUTHORITY + '/oauth2/v2.0/';
 var GRAPH = 'https://graph.microsoft.com/v1.0';
@@ -42,7 +42,7 @@ function save(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-// Liefert die Settings und stellt die Sprache für Statusmeldungen ein.
+// Sets the language for status messages from the settings.
 function applyLanguage(settings) {
   var phoneLang = (typeof navigator !== 'undefined' && navigator.language) || '';
   i18n.setLang(i18n.resolveLang(settings.language, phoneLang));
@@ -67,7 +67,7 @@ function getCalendars() {
   return load('calendars', { list: [], fetched: 0 });
 }
 
-// --- AppMessage-Warteschlange (einzeln senden, ACK/NACK mit Retry) ----------
+// --- AppMessage queue (send one at a time, ACK/NACK with retry) -------------
 
 var queue = [];
 var sending = false;
@@ -112,6 +112,7 @@ function sendSettings(settings) {
     SET_LANG: i18n.getLang() === 'en' ? 1 : 0,
     SET_TOUCH: settings.touch ? 1 : 0,
     SET_GRAY_PAST: settings.grayPast ? 1 : 0,
+    SET_AUTO_CLOSE: lib.autoCloseMinutes(settings.autoClose),
     SET_MOVE_OPTS: settings.moveEnabled ? settings.moveOptions : 0,
     SET_COLOR_ACCENT: settings.accentColor,
     SET_COLOR_TEXT: settings.textColor,
@@ -119,10 +120,10 @@ function sendSettings(settings) {
   });
 }
 
-// listDay: Epoch-Sekunden des ersten Tages, listDays: 2 = Cache (heute + morgen), 1 = ein Tag
-// --- Beschreibungen ---------------------------------------------------------
-// Kennung -> {id, notes}. Die Uhr kennt nur die Kennung (EVT_KEY) und fragt beim Öffnen
-// der Details nach (MSG_TYPE 12). In localStorage, damit es auch nach einem Neustart klappt.
+// listDay: epoch seconds of the first day, listDays: 2 = cache (today + tomorrow), 1 = single day
+// --- Descriptions -----------------------------------------------------------
+// Key -> {id, notes}. The watch only knows the key (EVT_KEY) and requests the description
+// when opening the details (MSG_TYPE 12). Kept in localStorage so it survives a restart.
 
 function rememberNotes(events) {
   var index = load('notes', {});
@@ -154,7 +155,7 @@ function handleNoteRequest(key) {
     sendNote(key, entry.notes);
     return;
   }
-  // Beschreibung war nicht in der Liste -> einzeln abfragen
+  // Description was not in the list -> fetch it individually
   getToken(function(err, token) {
     if (err || !entry.id) {
       sendNote(key, '');
@@ -168,7 +169,7 @@ function handleNoteRequest(key) {
   });
 }
 
-// --- Verschieben -------------------------------------------------------------
+// --- Moving events ----------------------------------------------------------
 
 function sendMoveResult(key, ok, text) {
   enqueue({ MSG_TYPE: MSG.MOVE_RESULT, EVT_KEY: key, MOVE_OK: ok ? 1 : 0, STATUS_TEXT: text || '' });
@@ -177,7 +178,7 @@ function sendMoveResult(key, ok, text) {
 function handleMove(key, opt) {
   var settings = getSettings();
   var entry = load('notes', {})[key];
-  // Nochmals prüfen – die Uhr könnte veraltete Daten haben
+  // Check again - the watch may have stale data
   if (!entry || !entry.movable || !settings.moveEnabled || !(settings.moveOptions & (1 << opt))) {
     sendMoveResult(key, false, i18n.t('moveDenied'));
     return;
@@ -199,7 +200,7 @@ function handleMove(key, opt) {
     }, JSON.stringify(body), function(status) {
       if (status === 200) {
         sendMoveResult(key, true, '');
-        sync(true);  // Cache (heute + morgen) neu laden
+        sync(true);  // Reload the cache (today + tomorrow)
       } else if (status === 403) {
         sendMoveResult(key, false, i18n.t('moveDenied'));
       } else if (status === 0) {
@@ -262,10 +263,10 @@ function postForm(url, params, callback) {
           lib.formEncode(params), callback);
 }
 
-// --- Anmeldung --------------------------------------------------------------
+// --- Sign-in ----------------------------------------------------------------
 
-var login = null;      // laufender Device-Code-Login
-var tokenWaiters = []; // Callbacks, die auf das Login-Ergebnis warten
+var login = null;      // device code login in progress
+var tokenWaiters = []; // callbacks waiting for the login result
 
 function storeTokens(json) {
   var previous = getAuth() || {};
@@ -273,7 +274,7 @@ function storeTokens(json) {
     access: json.access_token,
     refresh: json.refresh_token || previous.refresh,
     expires: Date.now() + (json.expires_in || 3600) * 1000,
-    // Schreibrechte erhalten? (Antwort enthält die gewährten Scopes)
+    // Write access granted? (response contains the granted scopes)
     rw: json.scope ? /Calendars\.ReadWrite/i.test(json.scope) : !!previous.rw
   };
   save('auth', auth);
@@ -288,7 +289,7 @@ function getToken(callback) {
   }
   var auth = getAuth();
   if (auth && getSettings().moveEnabled && !auth.rw) {
-    // Verschieben wurde eingeschaltet -> einmalig neu anmelden, um Schreibrechte zu erhalten
+    // Moving was enabled -> sign in again once to obtain write access
     clearAuth();
     auth = null;
   }
@@ -323,7 +324,7 @@ function refreshToken(refresh, callback) {
 }
 
 function sendLoginCode() {
-  if (!login || !login.code) return;  // Code wird noch angefordert
+  if (!login || !login.code) return;  // code is still being requested
   enqueue({ MSG_TYPE: MSG.LOGIN_CODE, LOGIN_URL: login.url, LOGIN_CODE: login.code });
 }
 
@@ -404,7 +405,7 @@ function graphGet(url, token, callback) {
   }, null, callback);
 }
 
-// Alle Seiten (@odata.nextLink) abrufen. callback(httpStatus, items)
+// Fetch all pages (@odata.nextLink). callback(httpStatus, items)
 function graphGetAll(url, token, items, callback) {
   graphGet(url, token, function(status, json) {
     if (status !== 200 || !json) {
@@ -454,7 +455,7 @@ function fetchEvents(token, settings, win, callback) {
     }
     graphGetAll(bases[i] + query, token, [], function(status, items) {
       if (status === 401 && !retried) {
-        // Token abgelehnt -> einmal erneuern und wiederholen
+        // Token rejected -> refresh once and retry
         retried = true;
         var auth = getAuth();
         if (auth) {
@@ -472,7 +473,7 @@ function fetchEvents(token, settings, win, callback) {
         return;
       }
       if (status === 404 && bases.length > 1) {
-        // Ausgewählter Kalender existiert nicht mehr -> überspringen
+        // Selected calendar no longer exists -> skip it
         i++;
         next();
         return;
@@ -490,19 +491,19 @@ function fetchEvents(token, settings, win, callback) {
   next();
 }
 
-// --- Synchronisierung -------------------------------------------------------
-// Aufträge werden nacheinander abgearbeitet: der Cache (heute + morgen) beim App-Start
-// und einzelne Tage beim Blättern auf der Uhr (nur der zuletzt angeforderte Tag zählt).
+// --- Synchronization --------------------------------------------------------
+// Jobs are processed one after another: the cache (today + tomorrow) on app start
+// and single days when paging on the watch (only the most recently requested day counts).
 
 var busy = false;
 var busyIsCache = false;
 var pendingCache = false;
-var pendingDay = null;   // Epoch-Sekunden (lokale Mitternacht, wie von der Uhr geschickt)
+var pendingDay = null;   // epoch seconds (local midnight, as sent by the watch)
 
-// force: auch bei laufender Synchronisierung danach erneut laden (geänderte Einstellungen)
+// force: reload afterwards even if a sync is running (changed settings)
 function sync(force) {
   if (busy && busyIsCache && !force) {
-    // Läuft bereits -> zusammenfassen (genau eine Synchronisierung pro Start)
+    // Already running -> merge (exactly one sync per start)
     if (login) sendLoginCode();
     return;
   }
@@ -570,7 +571,7 @@ function run() {
   });
 }
 
-// --- Einstellungen (Clay) ---------------------------------------------------
+// --- Settings (Clay) --------------------------------------------------------
 
 var activeClay = null;
 var configCalendars = [];
@@ -580,8 +581,8 @@ function openConfig() {
   localStorage.removeItem('clay-settings');
   activeClay = new Clay(configPage.buildConfig(configCalendars, getSettings(), !!getAuth()), null,
                         { autoHandleEvents: false });
-  // Clay füllt meta nur beim "ready"-Event. Bei einer später erzeugten Instanz selbst setzen,
-  // sonst bietet der Farbwähler nur Schwarz/Weiß an.
+  // Clay only fills meta on the "ready" event. Set it ourselves for an instance created later,
+  // otherwise the color picker only offers black/white.
   try {
     activeClay.meta.activeWatchInfo = Pebble.getActiveWatchInfo ? Pebble.getActiveWatchInfo() : null;
     activeClay.meta.accountToken = Pebble.getAccountToken ? Pebble.getAccountToken() : '';
@@ -598,7 +599,7 @@ Pebble.addEventListener('showConfiguration', function() {
     openConfig();
     return;
   }
-  // Kalenderliste vorher aktualisieren, aber höchstens 4 s warten
+  // Refresh the calendar list first, but wait at most 4 s
   var opened = false;
   var timer = setTimeout(function() {
     opened = true;
@@ -648,7 +649,7 @@ Pebble.addEventListener('webviewclosed', function(e) {
   sync(true);
 });
 
-// --- Nachrichten von der Uhr ------------------------------------------------
+// --- Messages from the watch ------------------------------------------------
 
 function payloadValue(payload, name) {
   if (payload.hasOwnProperty(name)) return payload[name];
@@ -658,7 +659,7 @@ function payloadValue(payload, name) {
 
 Pebble.addEventListener('appmessage', function(e) {
   var type = payloadValue(e.payload || {}, 'MSG_TYPE');
-  // REQ_DAY = 0: Cache neu laden (Briefing bei offener App), sonst einzelner Tag (Blättern)
+  // REQ_DAY = 0: reload cache (briefing while app is open), otherwise single day (paging)
   if (type === MSG.REQUEST) {
     var day = payloadValue(e.payload || {}, 'REQ_DAY');
     if (day) {
@@ -673,7 +674,7 @@ Pebble.addEventListener('appmessage', function(e) {
   }
 });
 
-// Genau eine Synchronisierung pro App-Start.
+// Exactly one sync per app start.
 Pebble.addEventListener('ready', function() {
   sync();
 });

@@ -1,9 +1,9 @@
 #!/bin/sh
-# Prüft den C-Code gegen den Stub-Header (Syntax für alle Plattformen) und testet die Logik nativ.
+# Checks the C code against the stub header (syntax for all platforms) and tests the logic natively.
 set -e
 cd "$(dirname "$0")/../.."
-# Wie das echte Pebble SDK (arm-none-eabi-gcc): -std=c99 -Os -Wall -Wextra -Werror ...
-# -fshort-enums: Enums sind auf ARM vorzeichenlos (sonst fallen z. B. -Wtype-limits-Fehler nicht auf)
+# Like the real Pebble SDK (arm-none-eabi-gcc): -std=c99 -Os -Wall -Wextra -Werror ...
+# -fshort-enums: enums are unsigned on ARM (otherwise e.g. -Wtype-limits errors go unnoticed)
 FLAGS="-std=c99 -Os -fshort-enums -Wall -Wextra -Werror -Wno-unused-parameter \
   -Wno-error=unused-function -Wno-error=unused-variable -Wno-error=format-truncation \
   -Wno-error=unused-value -Wno-error=cast-function-type -Itest/c/stub"

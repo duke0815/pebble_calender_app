@@ -4,6 +4,7 @@
 #include "i18n.h"
 #include "theme.h"
 #include "ui_move.h"
+#include "idle.h"
 
 #if defined(PBL_PLATFORM_EMERY)
   #define FONT_SMALL FONT_KEY_GOTHIC_18
@@ -30,7 +31,7 @@ static CalEvent s_event;
 static char s_date[40];
 static char s_time[24];
 
-// Beschreibung: wird beim Öffnen vom Handy nachgeladen
+// Description: loaded from the phone when opened
 static char s_note[NOTE_LEN];
 static bool s_note_loading;
 static int s_note_tries;
@@ -58,7 +59,7 @@ static int16_t prv_add_text(int idx, const char *text, const char *font_key, int
   return y + h;
 }
 
-// Höhe der Beschreibung an den aktuellen Text anpassen
+// Fit the description height to the current text
 static void prv_layout_notes(void) {
   if (!s_layers[L_NOTES]) return;
   int16_t h = prv_text_height(s_note, FONT_SMALL, s_width);
@@ -90,7 +91,7 @@ static void prv_note_timeout(void *data) {
   prv_set_note_text(tr(STR_NOTES_NEED_PHONE));
 }
 
-// Anfrage senden; bei belegtem Sendepuffer kurz später erneut
+// Send the request; if the outbox is busy, retry shortly after
 static void prv_note_send(void *data) {
   s_note_send_timer = NULL;
   if (!s_note_loading) return;
@@ -112,11 +113,16 @@ static void prv_note_request(void) {
   prv_note_send(NULL);
 }
 
-// Select öffnet das Verschieben (wenn erlaubt); hoch/runter scrollt weiterhin
+// Select opens the move dialog (if allowed); up/down still scroll
 static void prv_select_click(ClickRecognizerRef recognizer, void *context) {
+  idle_kick();
   if (ui_move_available(&s_event)) {
     ui_move_show(&s_event);
   }
+}
+
+static void prv_scrolled(ScrollLayer *scroll_layer, void *context) {
+  idle_kick();
 }
 
 static void prv_click_config(void *context) {
@@ -129,7 +135,10 @@ static void prv_window_load(Window *window) {
   s_width = bounds.size.w;
 
   s_scroll = scroll_layer_create(bounds);
-  scroll_layer_set_callbacks(s_scroll, (ScrollLayerCallbacks) { .click_config_provider = prv_click_config });
+  scroll_layer_set_callbacks(s_scroll, (ScrollLayerCallbacks) {
+    .click_config_provider = prv_click_config,
+    .content_offset_changed_handler = prv_scrolled,
+  });
   scroll_layer_set_click_config_onto_window(s_scroll, window);
   scroll_layer_set_shadow_hidden(s_scroll, true);
   layer_add_child(root, scroll_layer_get_layer(s_scroll));
@@ -159,7 +168,7 @@ static void prv_window_load(Window *window) {
     y = prv_add_text(L_MOVE_HINT, tr(STR_MOVE_HINT), FONT_SMALL, y + 2);
     text_layer_set_text_color(s_layers[L_MOVE_HINT], PBL_IF_COLOR_ELSE(theme_accent(), theme_text()));
   } else if (ui_move_reason(&s_event)) {
-    // Verschieben ist an, aber nicht für diesen Termin -> Grund anzeigen
+    // Moving is on, but not for this event -> show the reason
     y = prv_add_text(L_MOVE_HINT, ui_move_reason(&s_event), FONT_SMALL, y + 2);
     text_layer_set_text_color(s_layers[L_MOVE_HINT], theme_muted());
   }

@@ -1,5 +1,5 @@
-// Host-Test der Uhr-Logik (events.c, settings.c) gegen den Stub-Header.
-// Ausführen: sh test/c/run.sh
+// Host test of the watch logic (events.c, settings.c) against the stub header.
+// Run: sh test/c/run.sh
 #include <pebble.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -57,45 +57,45 @@ static void add(int i, time_t start, time_t end, int all_day, const char *title)
 
 int main(void) {
   setenv("TZ", "Europe/Vienna", 1); tzset();
-  printf("sizeof(CalEvent)=%zu, Cache gesamt=%zu Byte\n", sizeof(CalEvent), sizeof(CalEvent) * MAX_CACHE_EVENTS);
+  printf("sizeof(CalEvent)=%zu, cache total=%zu bytes\n", sizeof(CalEvent), sizeof(CalEvent) * MAX_CACHE_EVENTS);
   assert(sizeof(CalEvent) <= 256);
   assert(sizeof(CalEvent) * MAX_CACHE_EVENTS <= 2600);
   assert(sizeof(CalEvent) == 160);
 
-  s_now = local(2026, 10, 1, 10, 0);  // Do 01.10.2026 10:00
+  s_now = local(2026, 10, 1, 10, 0);  // Thu 2026-10-01 10:00
   settings_load();
   events_load_cache();
   events_set_view_day(s_now);
-  assert(!events_view_available());   // noch kein Cache
+  assert(!events_view_available());   // no cache yet
 
   time_t today = local(2026, 10, 1, 0, 0);
   time_t tomorrow = local(2026, 10, 2, 0, 0);
 
-  // Cache-Liste (heute + morgen): Ganztägig seit gestern, vorbei, später, morgen
+  // Cache list (today + tomorrow): all-day since yesterday, past, later, tomorrow
   add(0, local(2026, 9, 30, 0, 0), local(2026, 10, 2, 0, 0), 1, "Messe");
   add(1, local(2026, 10, 1, 8, 0), local(2026, 10, 1, 9, 0), 0, "Frueh");
   add(2, local(2026, 10, 1, 14, 0), local(2026, 10, 1, 15, 0), 0, "Spaeter");
   add(3, local(2026, 10, 2, 9, 0), local(2026, 10, 2, 10, 0), 0, "Morgen");
-  assert(!events_commit(5, today, 2));        // unvollständig -> verworfen
+  assert(!events_commit(5, today, 2));        // incomplete -> discarded
   add(0, local(2026, 9, 30, 0, 0), local(2026, 10, 2, 0, 0), 1, "Messe");
   add(1, local(2026, 10, 1, 8, 0), local(2026, 10, 1, 9, 0), 0, "Frueh");
   add(2, local(2026, 10, 1, 14, 0), local(2026, 10, 1, 15, 0), 0, "Spaeter");
   add(3, local(2026, 10, 2, 9, 0), local(2026, 10, 2, 10, 0), 0, "Morgen");
   assert(events_commit(4, today, 2));
 
-  // Heute: 3 Termine, erster anstehender = Messe (läuft noch)
+  // Today: 3 events, first upcoming = Messe (still running)
   events_rebuild_view();
   assert(events_view_available());
   assert(events_view_count() == 3);
   uint16_t r;
   assert(events_view_first_upcoming(&r) && r == 0);
 
-  // Morgen kommt aus dem Cache
+  // Tomorrow comes from the cache
   events_set_view_day(tomorrow);
   assert(events_view_available() && events_view_count() == 1);
   assert(strcmp(events_view_get(0)->title, "Morgen") == 0);
 
-  // Übermorgen fehlt -> Tagesliste vom Handy (nur RAM)
+  // Day after tomorrow missing -> day list from the phone (RAM only)
   time_t day3 = local(2026, 10, 3, 0, 0);
   events_set_view_day(day3);
   assert(!events_view_available());
@@ -103,74 +103,74 @@ int main(void) {
   assert(events_commit(1, day3, 1));
   events_rebuild_view();
   assert(events_view_available() && events_view_count() == 1);
-  // Gestern: ebenfalls Tagesliste, ersetzt den Tagespuffer
+  // Yesterday: also a day list, replaces the day buffer
   time_t yesterday = local(2026, 9, 30, 0, 0);
   events_set_view_day(yesterday);
   assert(!events_view_available());
-  assert(events_commit(0, yesterday, 1));      // leerer Tag
+  assert(events_commit(0, yesterday, 1));      // empty day
   events_rebuild_view();
   assert(events_view_available() && events_view_count() == 0);
-  // Cache unverändert
+  // cache unchanged
   events_set_view_day(today);
   assert(events_view_count() == 3);
 
-  // Max. 12 Termine pro Tag in der Ansicht
+  // Max. 12 events per day in the view
   time_t day5 = local(2026, 10, 5, 0, 0);
   events_set_view_day(day5);
   for (int i = 0; i < 14; i++) add(i, local(2026, 10, 5, 8, i), local(2026, 10, 5, 9, i), 0, "X");
-  assert(events_commit(14, day5, 1));          // auf MAX_DAY_EVENTS gekürzt
+  assert(events_commit(14, day5, 1));          // truncated to MAX_DAY_EVENTS
   events_rebuild_view();
   assert(events_view_count() == MAX_DAY_EVENTS);
 
-  // Verspätete Antwort für einen anderen Tag wird verworfen, Anzeige bleibt
+  // Late reply for a different day is discarded, display stays
   add(0, local(2026, 10, 4, 9, 0), local(2026, 10, 4, 10, 0), 0, "Zu spaet");
   assert(!events_commit(1, local(2026, 10, 4, 0, 0), 1));
   events_rebuild_view();
   assert(events_view_count() == MAX_DAY_EVENTS && strcmp(events_view_get(0)->title, "X") == 0);
 
-  // Cache neu laden
+  // Reload cache
   events_load_cache();
   assert(events_last_sync() == s_now);
   events_set_view_day(today);
   assert(events_view_count() == 3);
 
-  // Nächster Tag (Fr) mit Cache vom Donnerstag: "morgen" ist jetzt heute
+  // Next day (Fri) with Thursday's cache: "tomorrow" is now today
   s_now = local(2026, 10, 2, 7, 0);
   events_set_view_day(s_now);
   assert(events_view_available() && events_view_count() == 1);
   assert(strcmp(events_view_get(0)->title, "Morgen") == 0);
-  // Samstag ist nicht im Cache
+  // Saturday is not in the cache
   events_set_view_day(day3);
   assert(!events_view_available());
 
-  // Briefing: Do 01.10. 10:00, 07:00 Mo-Fr -> Fr 02.10. 07:00
+  // Briefing: Thu 10-01 10:00, 07:00 Mon-Fri -> Fri 10-02 07:00
   s_now = local(2026, 10, 1, 10, 0);
   Settings *st = settings_get();
   st->brief_enabled = 1; st->brief_hour = 7; st->brief_minute = 0; st->brief_days = 0x3E;
   settings_schedule_wakeup();
   assert(s_wakeup_count == 1 && s_wakeups[0] == local(2026, 10, 2, 7, 0));
-  // Fr 02.10. 08:00 -> Wochenende überspringen -> Mo 05.10. 07:00
+  // Fri 10-02 08:00 -> skip weekend -> Mon 10-05 07:00
   s_now = local(2026, 10, 2, 8, 0);
   settings_schedule_wakeup();
   assert(s_wakeup_count == 1 && s_wakeups[0] == local(2026, 10, 5, 7, 0));
-  // Kollision: zwei Mal E_RANGE -> +2 Minuten
+  // Collision: E_RANGE twice -> +2 minutes
   s_reject_first = 2;
   settings_schedule_wakeup();
   assert(s_wakeup_count == 1 && s_wakeups[0] == local(2026, 10, 5, 7, 2));
-  // Zeitumstellung: Sa 24.10. 12:00, nur Sonntag -> So 25.10. 07:00 (MEZ)
+  // DST change: Sat 10-24 12:00, Sunday only -> Sun 10-25 07:00 (CET)
   s_now = local(2026, 10, 24, 12, 0); st->brief_days = 0x01;
   settings_schedule_wakeup();
   assert(s_wakeup_count == 1 && s_wakeups[0] == local(2026, 10, 25, 7, 0));
-  // Deaktiviert -> nichts geplant
+  // Disabled -> nothing scheduled
   st->brief_enabled = 0;
   settings_schedule_wakeup();
   assert(s_wakeup_count == 0);
 
-  // Tagesbeginn am Umstellungstag (So 25.10., 12:00 MEZ) = 00:00 MESZ
+  // Start of day on the DST change day (Sun 10-25, 12:00 CET) = 00:00 CEST
   assert(time_day_start(local(2026, 10, 25, 12, 0)) == local(2026, 10, 25, 0, 0));
   assert(time_day_start(local(2026, 3, 29, 12, 0)) == local(2026, 3, 29, 0, 0));
 
-  // Sprache: Standard aus Systemsprache, Texte und Datumsformat
+  // Language: default from system language, texts and date format
   assert(settings_get()->lang == LANG_DE);
   char buf[40];
   st->lang = LANG_DE;
@@ -184,10 +184,26 @@ int main(void) {
   assert(strcmp(buf, "Mon Oct 5") == 0);
   assert(strcmp(tr(STR_NO_EVENTS_TODAY), "No events today") == 0);
   s_locale = "en_US";
-  settings_load();  // gespeicherte Settings? hier keine -> Standard aus Locale
+  settings_load();  // saved settings? none here -> default from locale
   assert(settings_get()->lang == LANG_EN);
 
-  // Farben: Kontrastschrift auf Akzent, Grau für vergangene Termine
+  // Settings saved by an older version (struct without auto_close_min) stay valid
+  {
+    Settings old_settings = *settings_get();
+    old_settings.gray_past = 1;
+    persist_write_data(4, &old_settings, offsetof(Settings, auto_close_min));
+    settings_load();
+    assert(settings_get()->gray_past == 1);
+    assert(settings_get()->auto_close_min == 5);
+    settings_get()->auto_close_min = 0;
+    settings_save();
+    settings_load();
+    assert(settings_get()->auto_close_min == 0);
+    persist_delete(4);
+    settings_load();
+  }
+
+  // Colors: contrast text on accent, gray for past events
   st = settings_get();
   st->color_accent = 0x0055AA; st->color_bg = 0xFFFFFF;
   assert(theme_on_accent().argb == GColorWhite.argb);
@@ -196,6 +212,6 @@ int main(void) {
   assert(theme_on_accent().argb == GColorBlack.argb);
   assert(theme_muted().argb == GColorLightGray.argb);
 
-  printf("Uhr-Logik ok\n");
+  printf("Watch logic ok\n");
   return 0;
 }

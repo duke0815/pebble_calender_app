@@ -27,11 +27,11 @@
 #define DAY_ANIM_MS  220
 
 #if defined(PBL_PLATFORM_EMERY)
-  #define CARD_GAP   4   // ~0,5 mm Luft zwischen den Terminen (Pebble Time 2, ~200 ppi)
+  #define CARD_GAP   4   // ~0.5 mm gap between events (Pebble Time 2, ~200 ppi)
 #else
   #define CARD_GAP   3
 #endif
-#define CARD_MARGIN  4   // Abstand Rahmen <-> Displayrand
+#define CARD_MARGIN  4   // spacing frame <-> screen edge
 #define CARD_RADIUS  4
 #define DAY_LONG_PRESS_MS 400
 
@@ -52,20 +52,20 @@ static char s_date_text[32];
 static char s_status_text[64];
 static char s_empty_text[96];
 
-// Auswahl erst nach einem Tastendruck zeigen (vorher kein Termin hervorgehoben)
+// Show the selection only after a button press (no event highlighted before)
 static bool s_selection_visible;
 
 static void prv_interaction(void) {
   if (s_callbacks.interaction) s_callbacks.interaction();
 }
 
-// Eine Section: der angezeigte Tag. Ohne Termine eine Info-Zeile.
+// One section: the displayed day. Without events, one info row.
 static bool prv_is_info(void) {
   return events_view_count() == 0;
 }
 
 // ---------------------------------------------------------------------------
-// MenuLayer-Callbacks
+// MenuLayer callbacks
 
 static uint16_t prv_num_sections(MenuLayer *menu, void *ctx) {
   return 1;
@@ -75,7 +75,7 @@ static uint16_t prv_num_rows(MenuLayer *menu, uint16_t section, void *ctx) {
   return prv_is_info() ? 1 : events_view_count();
 }
 
-// Section-Header = Statuszeile, nur sichtbar, wenn es etwas zu melden gibt
+// Section header = status line, only visible when there is something to report
 static int16_t prv_header_height(MenuLayer *menu, uint16_t section, void *ctx) {
   return s_status_text[0] ? HEADER_H : 0;
 }
@@ -99,7 +99,7 @@ static void prv_draw_header(GContext *ctx, const Layer *cell, uint16_t section, 
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
-// Jeder Termin ist ein Kasten mit Rahmen; die halbe Lücke liegt oben und unten in der Zeile.
+// Each event is a framed box; half the gap sits at the top and bottom of the row.
 static void prv_draw_event(GContext *ctx, const Layer *cell, const CalEvent *e) {
   GRect bounds = layer_get_bounds(cell);
   bool highlighted = s_selection_visible && menu_cell_layer_is_highlighted(cell);
@@ -165,10 +165,10 @@ static void prv_selection_changed(MenuLayer *menu, MenuIndex new_index, MenuInde
   prv_interaction();
 }
 
-// Eigene Tastenbelegung (wie MenuLayer, plus):
-// - der erste Tastendruck blendet nur die Auswahl ein,
-// - hoch/runter lang drücken = vorheriger/nächster Tag,
-// - "Zurück" geht über einen Callback (die Touch-Navigation meldet "rechts wischen" als BACK).
+// Custom click config (like MenuLayer, plus):
+// - the first button press only reveals the selection,
+// - long-press up/down = previous/next day,
+// - "Back" goes through a callback (touch navigation reports "swipe right" as BACK).
 static bool prv_reveal_selection(void) {
   prv_interaction();
   if (s_selection_visible || prv_is_info()) return false;
@@ -221,7 +221,7 @@ static void prv_click_config(void *context) {
 }
 
 // ---------------------------------------------------------------------------
-// Fenster
+// Window
 
 static void prv_window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
@@ -257,7 +257,7 @@ static void prv_window_appear(Window *window) {
 
 static void prv_stop_day_anim(void) {
   if (s_day_anim) {
-    // Unschedule beendet und zerstört die Animation; der Stopped-Handler setzt s_day_anim zurück
+    // Unschedule stops and destroys the animation; the stopped handler resets s_day_anim
     animation_unschedule(property_animation_get_animation(s_day_anim));
     s_day_anim = NULL;
   }
@@ -280,7 +280,7 @@ void ui_main_apply_theme(void) {
   }
   if (s_menu_layer) {
     menu_layer_set_normal_colors(s_menu_layer, theme_bg(), theme_text());
-    // Die Auswahl zeichnet prv_draw_event selbst als gefüllten Kasten (und nur, wenn sichtbar)
+    // prv_draw_event draws the selection itself as a filled box (and only when visible)
     menu_layer_set_highlight_colors(s_menu_layer, theme_bg(), theme_text());
     layer_mark_dirty(menu_layer_get_layer(s_menu_layer));
   }
@@ -324,12 +324,12 @@ static void prv_day_anim_stopped(Animation *animation, bool finished, void *cont
 }
 
 void ui_main_animate_day(int delta) {
-  s_selection_visible = false;  // neuer Tag: wieder ohne hervorgehobenen Termin
+  s_selection_visible = false;  // new day: no highlighted event again
   if (!s_menu_layer || delta == 0) return;
   prv_stop_day_anim();
   GRect to = s_menu_frame;
   GRect from = s_menu_frame;
-  // Nächster Tag kommt von rechts, vorheriger von links
+  // Next day slides in from the right, previous from the left
   from.origin.x = (delta > 0 ? 1 : -1) * s_menu_frame.size.w / 2;
   layer_set_frame(menu_layer_get_layer(s_menu_layer), from);
   s_day_anim = property_animation_create_layer_frame(menu_layer_get_layer(s_menu_layer), &from, &to);
@@ -367,7 +367,7 @@ void ui_main_set_status(const char *status, const char *empty_text) {
   strncpy(s_status_text, status, sizeof(s_status_text) - 1);
   s_status_text[sizeof(s_status_text) - 1] = '\0';
   if (s_menu_layer && had_status != (s_status_text[0] != '\0')) {
-    menu_layer_reload_data(s_menu_layer);  // Statuszeile ein-/ausblenden ändert die Header-Höhe
+    menu_layer_reload_data(s_menu_layer);  // showing/hiding the status line changes the header height
   }
   strncpy(s_empty_text, empty_text, sizeof(s_empty_text) - 1);
   s_empty_text[sizeof(s_empty_text) - 1] = '\0';

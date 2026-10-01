@@ -10,7 +10,7 @@
     "pebble-clay": "^1.0.4"
   },
   "pebble": {
-    "displayName": "Kalender für Office 365",
+    "displayName": "Calendar for Office 365",
     "uuid": "c9209dcb-0ee1-4b58-a023-461030dd283f",
     "sdkVersion": "3",
     "enableMultiJS": true,
@@ -56,7 +56,8 @@
       "EVT_FLAGS",
       "MOVE_OPT",
       "MOVE_OK",
-      "SET_MOVE_OPTS"
+      "SET_MOVE_OPTS",
+      "SET_AUTO_CLOSE"
     ],
     "resources": {
       "media": [

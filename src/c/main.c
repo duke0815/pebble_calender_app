@@ -9,25 +9,26 @@
 #include "ui_detail.h"
 #include "ui_move.h"
 #include "i18n.h"
+#include "idle.h"
 
 #define SYNC_TIMEOUT_MS        30000
 #define WAKEUP_SYNC_TIMEOUT_MS 10000
 #define DAY_TIMEOUT_MS         15000
 #define IDLE_EXIT_MS           60000
 
-// Erlaubter Bereich für das Blättern, relativ zu heute
+// Allowed range for paging through days, relative to today
 #define MIN_DAY_OFFSET -60
 #define MAX_DAY_OFFSET 90
 
-// Wischgesten: Mindestweg (Pixel), Zeitfenster für die vom System erzeugte BACK-Taste (ms)
+// Swipes: minimum distance (pixels), time window for the system-generated BACK press (ms)
 #define SWIPE_MIN_PX        30
 #define TOUCH_BACK_WINDOW_MS 600
 
 typedef enum {
-  STATE_IDLE,      // Daten aktuell (oder noch nie synchronisiert)
+  STATE_IDLE,      // data up to date (or never synced)
   STATE_SYNCING,
-  STATE_OFFLINE,   // Handy/Internet nicht erreichbar -> Cache
-  STATE_ERROR,     // Fehlertext vom Handy
+  STATE_OFFLINE,   // phone/internet unreachable -> cache
+  STATE_ERROR,     // error text from the phone
 } SyncState;
 
 static SyncState s_state = STATE_IDLE;
@@ -35,15 +36,14 @@ static char s_error[STATUS_LEN];
 static bool s_login_active;
 static bool s_wakeup_launch;
 static AppTimer *s_sync_timer;
-static AppTimer *s_idle_timer;
 
-// Einzelner Tag außerhalb des Caches, der gerade vom Handy geladen wird
+// Single day outside the cache currently being loaded from the phone
 static bool s_day_loading;
 static time_t s_requested_day;
 static AppTimer *s_day_timer;
 
 // ---------------------------------------------------------------------------
-// Statusanzeige
+// Status display
 
 static void prv_update_status(void) {
   char status[STATUS_LEN];
@@ -76,7 +76,7 @@ static void prv_update_status(void) {
       snprintf(status, sizeof(status), "%s", s_error);
       break;
     default:
-      status[0] = '\0';  // Normalfall: keine Statuszeile, oben steht nur das Datum
+      status[0] = '\0';  // normal case: no status line, only the date at the top
   }
 
   bool today = events_view_day() == time_day_start(time(NULL));
@@ -106,7 +106,7 @@ static void prv_set_state(SyncState state) {
 }
 
 // ---------------------------------------------------------------------------
-// Synchronisierung
+// Synchronization
 
 static void prv_cancel_sync_timer(void) {
   if (s_sync_timer) {
@@ -127,7 +127,7 @@ static void prv_arm_sync_timer(uint32_t timeout_ms) {
   s_sync_timer = app_timer_register(timeout_ms, prv_sync_timeout, NULL);
 }
 
-// Cache (heute + morgen) neu anfordern – nur beim Briefing bei bereits offener App.
+// Re-request the cache (today + tomorrow) - only for the briefing while the app is open.
 static void prv_request_refresh(void) {
   if (!connection_service_peek_pebble_app_connection() || !comm_request(0)) {
     prv_cancel_sync_timer();
@@ -139,7 +139,7 @@ static void prv_request_refresh(void) {
 }
 
 // ---------------------------------------------------------------------------
-// Tage blättern
+// Paging through days
 
 static AppTimer *s_day_send_timer;
 
@@ -155,7 +155,7 @@ static void prv_day_done(void) {
   }
 }
 
-// Tage blättern: per Wischen (Touch) oder hoch/runter lang drücken
+// Page through days: by swiping (touch) or long-pressing up/down
 static int s_day_send_tries;
 
 static void prv_day_timeout(void *data) {
@@ -165,7 +165,7 @@ static void prv_day_timeout(void *data) {
   ui_main_reload(false);
 }
 
-// Anfrage senden; ist der Sendepuffer noch belegt (schnelles Wischen), kurz später erneut.
+// Send the request; if the outbox is still busy (fast swiping), retry shortly after.
 static void prv_day_send(void *data) {
   s_day_send_timer = NULL;
   if (!s_day_loading) return;
@@ -198,30 +198,25 @@ static void prv_change_day(int delta) {
 
 
 // ---------------------------------------------------------------------------
-// Inaktivität (nur beim Start durch das Briefing)
+// Inactivity: briefing launch 60 s, otherwise the "Close automatically" setting
 
-static void prv_idle_exit(void *data) {
-  s_idle_timer = NULL;
-  window_stack_pop_all(false);
+static void prv_apply_idle(void) {
+  idle_configure(s_wakeup_launch ? IDLE_EXIT_MS : (uint32_t)settings_get()->auto_close_min * 60000);
 }
 
 static void prv_interaction(void) {
-  if (!s_wakeup_launch) return;
-  if (s_idle_timer) {
-    app_timer_reschedule(s_idle_timer, IDLE_EXIT_MS);
-  } else {
-    s_idle_timer = app_timer_register(IDLE_EXIT_MS, prv_idle_exit, NULL);
-  }
+  idle_kick();
 }
 
 // ---------------------------------------------------------------------------
-// Nachrichten vom Handy
+// Messages from the phone
 
 static void prv_list_updated(bool complete, time_t list_day, int list_days) {
   s_login_active = false;
+  idle_pause(false);
   ui_login_hide();
   if (list_days < 2) {
-    // Einzelner Tag (Blättern)
+    // Single day (paging)
     if (list_day == s_requested_day) {
       prv_day_done();
     }
@@ -241,6 +236,7 @@ static void prv_list_updated(bool complete, time_t list_day, int list_days) {
 
 static void prv_status(int code, const char *text) {
   s_login_active = false;
+  idle_pause(false);
   ui_login_hide();
   if (code != STATUS_SYNCING) {
     prv_day_done();
@@ -262,6 +258,7 @@ static void prv_status(int code, const char *text) {
 
 static void prv_login_code(const char *url, const char *code) {
   s_login_active = true;
+  idle_pause(true);  // sign-in needs the app open
   prv_cancel_sync_timer();
   ui_login_show(url, code);
 }
@@ -271,6 +268,7 @@ static void prv_apply_touch_setting(void);
 
 static void prv_settings_changed(void) {
   prv_apply_touch_setting();
+  prv_apply_idle();
   ui_main_apply_theme();
   prv_update_status();
   ui_main_reload(true);
@@ -278,8 +276,8 @@ static void prv_settings_changed(void) {
 
 static void prv_change_day(int delta);
 
-// Verschieben-Ergebnis: Anzeige im Verschiebe-Fenster; bei Erfolg Tag neu laden
-// (den Cache lädt das Handy nach dem Verschieben ohnehin neu).
+// Move result: shown in the move window; on success reload the day
+// (the phone reloads the cache after moving anyway).
 static void prv_move_result(int32_t key, bool ok, const char *text) {
   ui_move_result(key, ok, text);
   if (ok) {
@@ -305,11 +303,11 @@ static void prv_send_failed(void) {
 }
 
 // ---------------------------------------------------------------------------
-// Touch (Pebble Time 2): links/rechts = Tag wechseln, hoch/runter = scrollen
+// Touch (Pebble Time 2): left/right = change day, up/down = scroll
 
-// Vertikales Scrollen (flüssig, mit Schwung), Tippen = Termin öffnen und Wischen nach rechts in
-// der Detailansicht übernimmt die Touch-Navigation von PebbleOS (app_touch_navigation_enable).
-// Selbst ausgewertet wird nur das horizontale Wischen in der Tagesansicht.
+// Vertical scrolling (smooth, with momentum), tap = open event, and swipe right in
+// the detail view are handled by PebbleOS touch navigation (app_touch_navigation_enable).
+// Only horizontal swipes in the day view are evaluated by the app itself.
 #if defined(PBL_TOUCH)
 static bool s_touch_active;
 static bool s_finger_down;
@@ -328,9 +326,9 @@ static void prv_touch_handler(const TouchEvent *event, void *context) {
   switch (event->type) {
     case TouchEvent_Touchdown:
       s_finger_down = true;
-      // Nur Gesten, die in der Tagesansicht beginnen, wechseln den Tag. Wichtig: Die
-      // Touch-Navigation des Systems sieht das Abheben vor uns und schließt bei "rechts
-      // wischen" die Detailansicht – beim Abheben läge dann schon die Tagesansicht oben.
+      // Only gestures that start in the day view change the day. Important: the
+      // system touch navigation sees the liftoff before us and closes the detail view on
+      // "swipe right" - by our liftoff the day view would already be on top.
       s_touch_active = !event->non_navigational && ui_main_is_top();
       s_touch_x = event->x;
       s_touch_y = event->y;
@@ -340,6 +338,7 @@ static void prv_touch_handler(const TouchEvent *event, void *context) {
     case TouchEvent_Liftoff:
       s_finger_down = false;
       s_last_liftoff_ms = prv_now_ms();
+      prv_interaction();
       break;
     default:
       return;
@@ -351,15 +350,14 @@ static void prv_touch_handler(const TouchEvent *event, void *context) {
   int dy = event->y - s_touch_y;
   int adx = dx < 0 ? -dx : dx;
   int ady = dy < 0 ? -dy : dy;
-  prv_interaction();
   if (adx < SWIPE_MIN_PX || adx <= ady) {
-    return;  // Tippen/vertikal: macht das System
+    return;  // tap/vertical: handled by the system
   }
-  prv_change_day(dx < 0 ? 1 : -1);  // nach links wischen = nächster Tag
+  prv_change_day(dx < 0 ? 1 : -1);  // swipe left = next day
 }
 
-// Die Touch-Navigation meldet "nach rechts wischen" als BACK-Taste. In der Tagesansicht
-// heißt das "vorheriger Tag" (macht prv_touch_handler) – nur echte Tastendrücke beenden die App.
+// Touch navigation reports "swipe right" as a BACK press. In the day view
+// that means "previous day" (done by prv_touch_handler) - only real button presses exit the app.
 static bool prv_back_is_from_touch(void) {
   return s_finger_down || (prv_now_ms() - s_last_liftoff_ms) < TOUCH_BACK_WINDOW_MS;
 }
@@ -390,8 +388,8 @@ static void prv_back(void) {
 // ---------------------------------------------------------------------------
 // Wakeup & Tick
 
-// Beim App-Start synchronisiert PebbleKit JS genau einmal von selbst ("ready").
-// Die Uhr wartet nur darauf und zeigt bis dahin den Cache.
+// On app start PebbleKit JS syncs exactly once on its own ("ready").
+// The watch just waits for it and shows the cache until then.
 static void prv_await_startup_sync(void) {
   if (!connection_service_peek_pebble_app_connection()) {
     prv_set_state(STATE_OFFLINE);
@@ -404,12 +402,12 @@ static void prv_await_startup_sync(void) {
 static void prv_briefing_start(void) {
   s_wakeup_launch = true;
   vibes_short_pulse();
-  prv_interaction();
+  prv_apply_idle();
   prv_await_startup_sync();
 }
 
 static void prv_wakeup_handler(WakeupId id, int32_t cookie) {
-  // App war beim Briefing-Zeitpunkt bereits offen.
+  // App was already open at briefing time.
   settings_schedule_wakeup();
   vibes_short_pulse();
   events_set_view_day(time(NULL));
@@ -418,7 +416,7 @@ static void prv_wakeup_handler(WakeupId id, int32_t cookie) {
 }
 
 static void prv_tick(struct tm *tick_time, TimeUnits changed) {
-  // Um Mitternacht auf den neuen Tag springen, wenn "heute" angezeigt wurde
+  // At midnight jump to the new day if "today" was displayed
   static time_t s_last_today;
   time_t today = time_day_start(time(NULL));
   if (s_last_today && today != s_last_today && events_view_day() == s_last_today) {
@@ -455,9 +453,10 @@ static void prv_init(void) {
 
   wakeup_service_subscribe(prv_wakeup_handler);
   prv_apply_touch_setting();
+  prv_apply_idle();
   tick_timer_service_subscribe(MINUTE_UNIT, prv_tick);
 
-  // Immer den nächsten Briefing-Zeitpunkt planen (auch nach einem Wakeup).
+  // Always schedule the next briefing time (also after a wakeup).
   settings_schedule_wakeup();
 
   if (launch_reason() == APP_LAUNCH_WAKEUP) {

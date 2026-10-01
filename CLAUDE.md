@@ -1,220 +1,233 @@
-# CLAUDE.md – Kalender für Office 365 (Pebble-App)
+# CLAUDE.md – Calendar for Office 365 (Pebble app)
 
-## Projektziel
-Pebble-Watchapp, die Office-365-Kalendertermine tageweise anzeigt (Tagesansicht, per Wischen blättern) und optional jeden Tag zu einer festen Uhrzeit ein Termin-Briefing auf der Uhr zeigt.
+## Project goal
+Pebble watchapp that shows Office 365 calendar events day by day (day view, swipe to page) and can optionally show an event briefing on the watch every day at a fixed time.
 
-**Priorität:** Version 1 ist primär für den Eigengebrauch (Pebble Time 2, eigenes Microsoft-Konto). Eine Veröffentlichung im Pebble-App-Store ist später möglich – dann meldet sich jeder Nutzer mit seinem eigenen Microsoft-Konto an. Firmenkonten-Themen (s. „Firmenkonten & Einschränkungen“) werden erst danach angegangen.
+**Priority:** Built primarily for the owner's own use (Pebble Time 2, own Microsoft account) and now being prepared for the Pebble app store – there, every user signs in with their own Microsoft account. Work-account topics (see "Work accounts & limitations") are secondary.
 
-**Grundprinzip: kein eigener Server.** Daten fließen ausschließlich Microsoft Graph → Handy (PebbleKit JS) → Uhr. Tokens bleiben am Handy des Nutzers.
+**Core principle: no own server.** Data flows only Microsoft Graph → phone (PebbleKit JS) → watch. Tokens stay on the user's phone.
+
+**Language:** Project files (code comments, README, docs, store text, this file) are in English. The app itself is bilingual (German/English). The owner talks to Claude in German – reply in German.
 
 ## Git
-- **Immer direkt auf `main` committen und pushen** (Wunsch des Projektinhabers). Keine Feature-Branches, keine Pull Requests, außer ausdrücklich verlangt.
-- Vor jedem Commit die Tests laufen lassen (siehe „Architektur“).
+- **Always commit and push directly to `main`** (owner's wish). No feature branches, no pull requests unless explicitly requested.
+- Run the tests before every commit (see "Architecture").
 
-## Plattform & Tooling
-- Zielgerät: Pebble Time 2 (`emery`, 200×228, Farbe). Zusätzlich gebaut für `basalt` und `diorite`; Layout rechnet relativ zu den Layer-Bounds, nicht mit festen Pixeln.
-- Pebble SDK: C (Uhr) + PebbleKit JS (Handy) + Clay (Einstellungsseite).
-- Entwicklung unter Windows → Pebble SDK in WSL2 betreiben (`uv tool install pebble-tool`, dann `pebble sdk install latest`).
-- Keine schweren JS-Abhängigkeiten außer Clay (`pebble-clay`).
-- PebbleKit JS in ES5 schreiben (keine Arrow-Functions, kein `let`/`const`, keine Promises).
+## Platform & tooling
+- Target device: Pebble Time 2 (`emery`, 200×228, color). Also built for `basalt` and `diorite`; layout is computed relative to layer bounds, not fixed pixels.
+- Pebble SDK: C (watch) + PebbleKit JS (phone) + Clay (settings page).
+- Development on Windows → run the Pebble SDK in WSL2 (`uv tool install pebble-tool`, then `pebble sdk install latest`).
+- No heavy JS dependencies besides Clay (`pebble-clay`).
+- Write PebbleKit JS in ES5 (no arrow functions, no `let`/`const`, no Promises).
 
-## Architektur
+## Architecture
 ```
-src/c/main.c         Einstieg, Wakeup, Inaktivitäts-Timer, Tage blättern, Touch-Gesten
-src/c/events.c/.h    Cache (heute+morgen), Tagespuffer, Tagesansicht
-src/c/comm.c/.h      AppMessage-Empfang/-Senden
-src/c/settings.c/.h  Uhr-Settings (Briefing) + Wakeup-Planung
-src/c/ui_main.c/.h   Hauptfenster: Statuszeile + MenuLayer
-src/c/ui_detail.c/.h Detailansicht eines Termins
-src/c/ui_login.c/.h  Anzeige des Device-Codes
-src/c/ui_move.c/.h   Termin verschieben: Optionen mit Zieldatum, Bestätigung, Ergebnis
-src/c/protocol.h     Gemeinsame Konstanten (MSG_TYPE, STATUS_CODE, Längen)
-src/pkjs/index.js    PebbleKit JS: Ablaufsteuerung, Auth, Graph, Senden an Uhr
-src/pkjs/lib.js      Reine Logik (Zeiten, Filter, Kürzen, Fehlerklassifizierung) – mit Node testbar
-src/pkjs/config.js   Clay-Konfiguration (wird dynamisch aufgebaut)
-src/c/format.c/.h    Zeit-/Datumsformatierung (DE/EN)
-src/c/i18n.c/.h      Texte der Uhr (Deutsch/Englisch), tr(STR_...)
-src/c/theme.c/.h     Farben aus den Settings + abgeleitete Kontrastfarben
-src/pkjs/i18n.js     Texte für Statusmeldungen und Einstellungsseite (Deutsch/Englisch)
-test/lib.test.js     Node-Tests für lib.js + config.js
-test/index.sim.js    Simulation von index.js (Pebble/XHR/localStorage gemockt)
-test/c/run.sh        C-Kompilierung mit SDK-Flags (-std=c99 -Os -Werror, -fshort-enums wie ARM) gegen Stub-pebble.h + native Logiktests
+src/c/main.c         Entry point, wakeup, inactivity, paging days, touch gestures
+src/c/events.c/.h    Cache (today+tomorrow), day buffer, day view
+src/c/comm.c/.h      AppMessage receive/send
+src/c/settings.c/.h  Watch settings (briefing, ...) + wakeup scheduling
+src/c/idle.c/.h      Exit the app after a time without interaction
+src/c/ui_main.c/.h   Main window: date bar, status line + MenuLayer
+src/c/ui_detail.c/.h Event detail view
+src/c/ui_login.c/.h  Device code display
+src/c/ui_move.c/.h   Move event: options with target date, confirmation, result
+src/c/protocol.h     Shared constants (MSG_TYPE, STATUS_CODE, lengths)
+src/c/format.c/.h    Time/date formatting (DE/EN)
+src/c/i18n.c/.h      Watch texts (German/English), tr(STR_...)
+src/c/theme.c/.h     Colors from the settings + derived contrast colors
+src/pkjs/index.js    PebbleKit JS: control flow, auth, Graph, sending to the watch
+src/pkjs/lib.js      Pure logic (times, filters, truncation, error classification) – testable with Node
+src/pkjs/config.js   Clay configuration (built dynamically)
+src/pkjs/i18n.js     Texts for status messages and the settings page (German/English)
+test/lib.test.js     Node tests for lib.js + config.js
+test/index.sim.js    Simulation of index.js (Pebble/XHR/localStorage mocked)
+test/c/run.sh        C compile with SDK flags (-std=c99 -Os -Werror, -fshort-enums like ARM) against a stub pebble.h + native logic tests
+docs/help.md         User help (linked from the store)
+docs/privacy.md      Privacy policy
+store/listing.md     Store texts
 ```
 
-Vor jedem Commit: `TZ=Europe/Vienna node test/lib.test.js && TZ=Europe/Vienna node test/index.sim.js && sh test/c/run.sh`. Der Stub (`test/c/stub/pebble.h`) muss bei neuen SDK-Aufrufen ergänzt werden – mit den echten Signaturen.
+Before every commit: `TZ=Europe/Vienna node test/lib.test.js && TZ=Europe/Vienna node test/index.sim.js && sh test/c/run.sh`. The stub (`test/c/stub/pebble.h`) must be extended for new SDK calls – with the real signatures.
 
-Zeitberechnung auf der Uhr nur über `time_make_local()` / `time_day_start()` (korrigiert DST-Versatz von `mktime`), nie `mktime` direkt.
+Time calculations on the watch only via `time_make_local()` / `time_day_start()` (corrects the DST offset of `mktime`), never `mktime` directly.
 
-## Authentifizierung (Microsoft Entra ID)
-- App-Registrierung: **Multi-Tenant + persönliche Microsoft-Konten**, Public Client („Öffentliche Clientflows zulassen“ = Ja), kein Client Secret.
-- Flow: **Device Code Flow**
+## Authentication (Microsoft Entra ID)
+- App registration: **multi-tenant + personal Microsoft accounts**, public client ("Allow public client flows" = Yes), no client secret.
+- Flow: **device code flow**
   - `POST https://login.microsoftonline.com/{AUTHORITY}/oauth2/v2.0/devicecode`
-  - `POST https://login.microsoftonline.com/{AUTHORITY}/oauth2/v2.0/token` (Polling im angegebenen Intervall, `slow_down` → +5 s)
-  - `AUTHORITY` als Konstante: Standard `common`; für Eigengebrauch kann die eigene Tenant-ID eingetragen werden.
-- Scopes: `https://graph.microsoft.com/Calendars.Read offline_access`; **nur wenn „Termine verschieben“ eingeschaltet ist** `Calendars.ReadWrite offline_access` (inkrementelle Zustimmung). `auth.rw` merkt sich, ob die Token-Antwort `Calendars.ReadWrite` enthielt; fehlt es bei eingeschaltetem Verschieben, werden die Tokens verworfen und der Login startet neu (Code auf der Uhr). Refresh fordert den Scope an, den das Token hat.
-- Anzeige des Codes **auf der Uhr**: „microsoft.com/devicelogin – Code: XXXXXX“. Login startet automatisch beim App-Start, wenn kein Token vorhanden ist. Es gibt **keinen Menüpunkt** dafür; Kontowechsel = in den Einstellungen „Abmelden“, dann App neu öffnen. Während des Logins muss die App offen bleiben (PebbleKit JS läuft nur, solange die Watchapp läuft).
-- Access Token + Refresh Token + Ablaufzeit in `localStorage` (PebbleKit JS). Erneuern, wenn weniger als 5 Minuten Restlaufzeit.
-- `invalid_grant` / `interaction_required` → Tokens löschen, Uhr zeigt „Bitte App neu öffnen zum Anmelden.“ (beim nächsten Start startet der Login automatisch).
-- Client-ID als Konstante in `src/pkjs/index.js`: `402716d7-8b06-443b-af50-c37348a787c4` (Public Client, kein Geheimnis). Steht dort `TODO`, zeigt die Uhr „Client-ID fehlt“.
+  - `POST https://login.microsoftonline.com/{AUTHORITY}/oauth2/v2.0/token` (poll at the given interval, `slow_down` → +5 s)
+  - `AUTHORITY` as a constant: default `common`; for own use the own tenant ID can be entered.
+- Scopes: `https://graph.microsoft.com/Calendars.Read offline_access`; **only when "Allow moving" is on** `Calendars.ReadWrite offline_access` (incremental consent). `auth.rw` records whether the token response contained `Calendars.ReadWrite`; if it is missing while moving is on, the tokens are discarded and sign-in restarts (code on the watch). Refresh requests the scope the token has.
+- The code is shown **on the watch**: "microsoft.com/devicelogin – Code: XXXXXX". Sign-in starts automatically on app start when there is no token. There is **no menu entry** for it; switching accounts = "Sign out" in the settings, then reopen the app. The app must stay open during sign-in (PebbleKit JS only runs while the watchapp runs).
+- Access token + refresh token + expiry in `localStorage` (PebbleKit JS). Refresh when less than 5 minutes remain.
+- `invalid_grant` / `interaction_required` → delete tokens, watch shows "Please reopen the app to sign in." (sign-in starts automatically on the next start).
+- Client ID as a constant in `src/pkjs/index.js`: `402716d7-8b06-443b-af50-c37348a787c4` (public client, not a secret). If it says `TODO`, the watch shows "Client ID missing".
 
 ## Microsoft Graph
-- Kalenderliste: `GET /v1.0/me/calendars?$select=id,name,isDefaultCalendar` → in `localStorage` cachen (max. 1×/Tag automatisch erneuern, sonst beim Öffnen der Einstellungen).
-- Termine: `GET /v1.0/me/calendars/{id}/calendarView?startDateTime=…&endDateTime=…&$select=id,subject,bodyPreview,start,end,isAllDay,location,isCancelled,showAs,responseStatus,isOrganizer,organizer,attendees&$orderby=start/dateTime&$top=50`
-  - Ohne Kalenderauswahl: `/v1.0/me/calendar/calendarView` (Standardkalender).
-  - Header `Prefer: outlook.timezone="UTC"` immer mitsenden.
-  - calendarView liefert Serientermine bereits aufgelöst – **keinen eigenen RRULE-Parser bauen**.
-  - Mehrere ausgewählte Kalender: je Kalender abfragen, zusammenführen, nach Start sortieren, kürzen.
-- Abfragezeitraum:
-  - **Cache-Liste** (App-Start, Briefing): heute 00:00 bis übermorgen 00:00 (lokal). Morgen wird mitgecacht, damit das Briefing am nächsten Morgen auch offline Daten hat. Max. 12 pro Tag, insgesamt max. 16 (heute hat Vorrang).
-  - **Tagesliste** (Blättern auf der Uhr): genau ein Tag, max. 12 Termine. Wird nur bei Bedarf geladen und auf der Uhr nur im RAM gehalten.
-- Zeiten: Graph liefert UTC ohne `Z` → in JS in Epoch-Sekunden umrechnen und so an die Uhr schicken.
-  - **Ganztägige Termine:** nur das Datum verwenden, nicht verschieben. Konvention: `EVT_START` = **lokale Mitternacht** des Startdatums, `EVT_END` = lokale Mitternacht des (exklusiven) Enddatums, beides in JS berechnet.
-- Abgesagte (`isCancelled`) und optional abgelehnte Termine (`responseStatus.response == "declined"`) ausfiltern; ganztägige optional ausblenden.
-- Pagination (`@odata.nextLink`) berücksichtigen.
-- **Beschreibung (Outlook-Notiz):** `bodyPreview` (Klartext, max. 255 Zeichen) kommt mit der Terminliste. JS bereitet sie auf (`lib.cleanNotes`: Teams-/Einladungsblock ab `____`/„Microsoft Teams“ abschneiden, Leerzeilen zusammenfassen, Zeilenumbrüche behalten, max. 300 Zeichen / 400 Byte) und merkt sie sich mit einer 32-Bit-Kennung (`lib.eventKey`, FNV-1a der Graph-ID) in `localStorage` (`notes`, max. 80 Einträge). Fehlt sie dort, Fallback `GET /me/events/{id}?$select=bodyPreview`. Die Uhr speichert nur die Kennung (`EVT_KEY`), nicht den Text.
-- Fehler: 401 → einmal Token erneuern und wiederholen; 403 → „Kein Zugriff auf Kalender“; sonst „Graph-Fehler <Status>“; Status 0/Timeout → „Keine Verbindung“.
+- Calendar list: `GET /v1.0/me/calendars?$select=id,name,isDefaultCalendar` → cache in `localStorage` (refresh automatically at most once a day, otherwise when the settings are opened).
+- Events: `GET /v1.0/me/calendars/{id}/calendarView?startDateTime=…&endDateTime=…&$select=id,subject,bodyPreview,start,end,isAllDay,location,isCancelled,showAs,responseStatus,isOrganizer,organizer,attendees&$orderby=start/dateTime&$top=50`
+  - Without a calendar selection: `/v1.0/me/calendar/calendarView` (default calendar).
+  - Always send the header `Prefer: outlook.timezone="UTC"`.
+  - calendarView already expands recurring events – **do not build an own RRULE parser**.
+  - Several selected calendars: query each, merge, sort by start, truncate.
+- Query range:
+  - **Cache list** (app start, briefing): today 00:00 to the day after tomorrow 00:00 (local). Tomorrow is cached too so the briefing next morning has data even offline. Max. 12 per day, max. 16 in total (today has priority).
+  - **Day list** (paging on the watch): exactly one day, max. 12 events. Loaded only on demand and kept on the watch only in RAM.
+- Times: Graph returns UTC without `Z` → convert to epoch seconds in JS and send them like that to the watch.
+  - **All-day events:** use only the date, do not shift. Convention: `EVT_START` = **local midnight** of the start date, `EVT_END` = local midnight of the (exclusive) end date, both computed in JS.
+- Filter out cancelled (`isCancelled`) and optionally declined events (`responseStatus.response == "declined"`); optionally hide all-day events.
+- Handle pagination (`@odata.nextLink`).
+- **Description (Outlook note):** `bodyPreview` (plain text, max. 255 chars) comes with the event list. JS cleans it up (`lib.cleanNotes`: cut the Teams/invitation block starting at `____`/"Microsoft Teams", collapse blank lines, keep line breaks, max. 300 chars / 400 bytes) and stores it under a 32-bit key (`lib.eventKey`, FNV-1a of the Graph ID) in `localStorage` (`notes`, max. 80 entries). If it is missing there, fallback `GET /me/events/{id}?$select=bodyPreview`. The watch only stores the key (`EVT_KEY`), not the text.
+- Errors: 401 → refresh the token once and retry; 403 → "No access to calendar"; otherwise "Graph error <status>"; status 0/timeout → "No connection".
 
-## Einstellungen (Clay)
-Clay-Config wird beim Öffnen (`showConfiguration`) **dynamisch** aus der gecachten Kalenderliste gebaut (`autoHandleEvents: false`, neue Clay-Instanz pro Öffnen, `clay-settings` vorher löschen – die Defaults kommen aus unseren eigenen Settings).
+## Settings (Clay)
+The Clay config is built **dynamically** from the cached calendar list when opened (`showConfiguration`) (`autoHandleEvents: false`, a new Clay instance per opening, delete `clay-settings` first – the defaults come from our own settings).
 
-| Einstellung | Typ |
+| Setting | Type |
 |---|---|
-| Kalender | Checkbox-Gruppe (Default: Standardkalender) |
-| Ganztägige Termine anzeigen | Toggle (Default an) |
-| Abgelehnte Termine ausblenden | Toggle (Default an) |
-| Vergangene Termine ausgrauen | Toggle (Default **aus** = alle Termine gleiche Farbe) |
-| Touch-Bedienung | Toggle (Default an); aus = kein Wischen/Tippen, Tageswechsel nur per Tasten |
-| Sprache | Auswahl: Automatisch (wie Handy, `navigator.language`) / Deutsch / English |
-| Akzentfarbe | Farbwähler (Default `0055AA` Kobaltblau): Datumsleiste + ausgewählter Termin |
-| Schriftfarbe | Farbwähler (Default `000000`) |
-| Hintergrundfarbe | Farbwähler (Default `FFFFFF`) |
-| Tägliches Briefing | Toggle (Default aus) |
-| Briefing-Uhrzeit | Zeit (Default 07:00) |
-| Briefing-Wochentage | Checkbox-Gruppe (Default Mo–Fr) |
-| Verschieben erlauben | Toggle (Default **aus**); an → Schreibrechte, einmalige Neuanmeldung |
-| Verschieben: Erlaubt für | Auswahl: `solo` = eigene Termine ohne Teilnehmer (Default) / `own` = alle eigenen (Teilnehmer bekommen ein Update) |
-| Verschieben: Möglichkeiten | Checkbox-Gruppe: 1 Stunde / 1 Tag / 2 Tage / 1 Woche später / nächster Montag (Default 1 Tag + 1 Woche, Bitmaske `moveOptions`) |
-| Abmelden | Toggle → Tokens löschen |
+| Calendars | Checkbox group (default: default calendar) |
+| Show all-day events | Toggle (default on) |
+| Hide declined events | Toggle (default on) |
+| Gray out past events | Toggle (default **off** = all events the same color) |
+| Touch control | Toggle (default on); off = no swiping/tapping, change the day only with buttons |
+| Close automatically | Select: never / 2 / 5 / 10 minutes without interaction (default **5**, `autoClose`). Saves battery (touch sensor). Paused during sign-in; a briefing launch always closes after 60 s |
+| Language | Select: Automatic (like phone, `navigator.language`) / Deutsch / English |
+| Accent color | Color picker (default `0055AA` cobalt blue): date bar + selected event |
+| Text color | Color picker (default `000000`) |
+| Background color | Color picker (default `FFFFFF`) |
+| Daily briefing | Toggle (default off) |
+| Briefing time | Time (default 07:00) |
+| Briefing weekdays | Checkbox group (default Mon–Fri) |
+| Allow moving | Toggle (default **off**); on → write access, one-time new sign-in |
+| Moving allowed for | Select: `solo` = own events without attendees (default) / `own` = all own events (attendees get an update) |
+| Move options | Checkbox group: 1 hour / 1 day / 2 days / 1 week later / next Monday (default 1 day + 1 week, bitmask `moveOptions`) |
+| Sign out | Toggle → delete tokens |
 
-Clay füllt `meta.activeWatchInfo` nur beim `ready`-Event – bei der pro Öffnen neu erzeugten Instanz setzt `index.js` das selbst (sonst zeigt der Farbwähler nur Schwarz/Weiß). Keine `capabilities` in der Config verwenden (Clay kennt neuere Plattformen nicht).
+Clay fills `meta.activeWatchInfo` only on the `ready` event – for the instance created per opening, `index.js` sets it itself (otherwise the color picker only shows black/white). Do not use `capabilities` in the config (Clay does not know newer platforms).
 
-Settings, die die Uhr betreffen (Briefing an/aus, Uhrzeit, Wochentage, Sprache, Farben), per AppMessage (`MSG_TYPE = 5`) an die Uhr schicken und dort persistieren. JS schickt sie zusätzlich zu Beginn jeder Synchronisierung.
+Settings that concern the watch (briefing on/off, time, weekdays, language, colors, touch, gray past, auto close, move options) are sent via AppMessage (`MSG_TYPE = 5`) and persisted on the watch. JS also sends them at the start of every sync.
 
-## AppMessage-Protokoll
-Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NACK-Retry (bis 4 Versuche, wachsende Pause).
+The watch stores its settings as one struct under one persist key. **Append new fields at the end only**: `settings_load()` accepts older, shorter data (new fields keep their defaults).
 
-| Key | Typ | Inhalt |
+## AppMessage protocol
+Send events **one by one** (message size limit), with a queue and ACK/NACK retry (up to 4 attempts, growing pause).
+
+| Key | Type | Content |
 |---|---|---|
-| `MSG_TYPE` | int | Handy→Uhr: 1 = Termin, 2 = Ende der Liste, 3 = Status/Fehler, 4 = Login-Code, 5 = Settings, 6 = Beschreibung, 7 = Ergebnis Verschieben. Uhr→Handy: 10 = REQUEST (Daten anfordern), 12 = Beschreibung anfordern, 13 = Verschieben |
-| `EVT_INDEX` / `EVT_COUNT` | int | Position / Gesamtzahl (`EVT_COUNT` auch bei MSG_TYPE 2) |
-| `EVT_START` / `EVT_END` | int32 | Epoch-Sekunden (ganztägig: lokale Mitternacht, s. o.) |
+| `MSG_TYPE` | int | Phone→watch: 1 = event, 2 = end of list, 3 = status/error, 4 = login code, 5 = settings, 6 = description, 7 = move result. Watch→phone: 10 = REQUEST (request data), 12 = request description, 13 = move |
+| `EVT_INDEX` / `EVT_COUNT` | int | Position / total (`EVT_COUNT` also with MSG_TYPE 2) |
+| `EVT_START` / `EVT_END` | int32 | Epoch seconds (all-day: local midnight, see above) |
 | `EVT_ALLDAY` | int | 0/1 |
-| `EVT_TITLE` | cstring | max. 80 Zeichen **und** max. 95 Byte UTF-8, in JS gekürzt (`...`) |
-| `EVT_LOCATION` | cstring | max. 40 Zeichen **und** max. 47 Byte UTF-8 |
-| `EVT_KEY` | int32 | Kennung des Termins (bei MSG_TYPE 1, 6, 12) |
-| `EVT_FLAGS` | int | bei MSG_TYPE 1: Bit 0 = verschiebbar, Bit 1 = nicht Organisator, Bit 2 = hat Teilnehmer, Bit 3 = Verschieben am Handy an (`lib.moveFlags`) |
-| `MOVE_OPT` | int | bei MSG_TYPE 13: 0 = +1 Stunde, 1 = +1 Tag, 2 = +2 Tage, 3 = +1 Woche, 4 = nächster Montag (gleiche Uhrzeit; Termin am Montag → Montag in einer Woche) |
-| `MOVE_OK` | int | bei MSG_TYPE 7: 1 = verschoben, 0 = Fehler (Text in `STATUS_TEXT`) |
-| `SET_MOVE_OPTS` | int | Bitmaske der erlaubten Optionen, 0 = Verschieben aus |
-| `NOTE_TEXT` | cstring | bei MSG_TYPE 6: aufbereitete Beschreibung (max. 400 Byte), leer = keine |
-| `LIST_DAY` / `LIST_DAYS` | int | bei MSG_TYPE 2: lokale Mitternacht (Epoch) des ersten Tages / Anzahl Tage (2 = Cache, 1 = einzelner Tag) |
-| `REQ_DAY` | int | bei MSG_TYPE 10: 0 = Cache neu laden, sonst lokale Mitternacht des gewünschten Tages (JS schickt sie als `LIST_DAY` unverändert zurück) |
-| `STATUS_CODE` | int | 1 = Synchronisiere, 2 = Anmeldung nötig, 3 = Admin-Freigabe nötig, 4 = Richtlinie blockiert, 5 = Keine Verbindung, 6 = Sonstiger Fehler, 7 = Konfiguration fehlt |
-| `STATUS_TEXT` | cstring | Fehler-/Statustext (deutsch, kurz) |
-| `LOGIN_URL` / `LOGIN_CODE` | cstring | Device-Code-Anzeige |
+| `EVT_TITLE` | cstring | max. 80 chars **and** max. 95 bytes UTF-8, truncated in JS (`...`) |
+| `EVT_LOCATION` | cstring | max. 40 chars **and** max. 47 bytes UTF-8 |
+| `EVT_KEY` | int32 | Event key (with MSG_TYPE 1, 6, 12) |
+| `EVT_FLAGS` | int | with MSG_TYPE 1: bit 0 = movable, bit 1 = not organizer, bit 2 = has attendees, bit 3 = moving on at the phone (`lib.moveFlags`) |
+| `MOVE_OPT` | int | with MSG_TYPE 13: 0 = +1 hour, 1 = +1 day, 2 = +2 days, 3 = +1 week, 4 = next Monday (same time; event on a Monday → Monday a week later) |
+| `MOVE_OK` | int | with MSG_TYPE 7: 1 = moved, 0 = error (text in `STATUS_TEXT`) |
+| `SET_MOVE_OPTS` | int | Bitmask of allowed options, 0 = moving off |
+| `NOTE_TEXT` | cstring | with MSG_TYPE 6: cleaned description (max. 400 bytes), empty = none |
+| `LIST_DAY` / `LIST_DAYS` | int | with MSG_TYPE 2: local midnight (epoch) of the first day / number of days (2 = cache, 1 = single day) |
+| `REQ_DAY` | int | with MSG_TYPE 10: 0 = reload cache, otherwise local midnight of the requested day (JS returns it unchanged as `LIST_DAY`) |
+| `STATUS_CODE` | int | 1 = syncing, 2 = sign-in needed, 3 = admin consent needed, 4 = policy blocks, 5 = no connection, 6 = other error, 7 = configuration missing |
+| `STATUS_TEXT` | cstring | Error/status text (short) |
+| `LOGIN_URL` / `LOGIN_CODE` | cstring | Device code display |
 | `SET_BRIEF_ENABLED` | int | 0/1 |
-| `SET_BRIEF_HOUR` / `SET_BRIEF_MINUTE` | int | Briefing-Uhrzeit |
-| `SET_BRIEF_DAYS` | int | Bitmaske, Bit 0 = Sonntag … Bit 6 = Samstag (wie `tm_wday`); Mo–Fr = 62 |
-| `SET_LANG` | int | 0 = Deutsch, 1 = Englisch (in JS aus „Automatisch“ aufgelöst) |
-| `SET_GRAY_PAST` | int | 1 = vergangene Termine grau, 0 = alle gleich (Default) |
-| `SET_TOUCH` | int | 1 = Touch-Bedienung an, 0 = aus (Uhr speichert invertiert als `touch_off`, damit alte Settings „an“ bedeuten) |
-| `SET_COLOR_ACCENT` / `SET_COLOR_TEXT` / `SET_COLOR_BG` | int | 0xRRGGBB, auf der Uhr per `GColorFromHEX()` |
+| `SET_BRIEF_HOUR` / `SET_BRIEF_MINUTE` | int | Briefing time |
+| `SET_BRIEF_DAYS` | int | Bitmask, bit 0 = Sunday … bit 6 = Saturday (like `tm_wday`); Mon–Fri = 62 |
+| `SET_LANG` | int | 0 = German, 1 = English (resolved from "Automatic" in JS) |
+| `SET_GRAY_PAST` | int | 1 = past events gray, 0 = all the same (default) |
+| `SET_TOUCH` | int | 1 = touch control on, 0 = off (the watch stores it inverted as `touch_off` so old settings mean "on") |
+| `SET_AUTO_CLOSE` | int | Minutes without interaction until the app exits, 0 = never (default 5) |
+| `SET_COLOR_ACCENT` / `SET_COLOR_TEXT` / `SET_COLOR_BG` | int | 0xRRGGBB, on the watch via `GColorFromHEX()` |
 
-- **Genau eine Synchronisierung pro App-Start:** JS synchronisiert beim `ready`-Event; die Uhr sendet beim Start nichts, sondern wartet (Statuszeile „Aktualisiere...“, Timeout) und zeigt bis dahin den Cache. Kein manuelles Aktualisieren, kein periodisches Nachladen.
-- `MSG_TYPE = 10` sendet die Uhr beim Blättern zu einem Tag außerhalb des Caches (`REQ_DAY` = Tag) und wenn das Briefing bei offener App fällig wird (`REQ_DAY` = 0). Sonst lädt JS nur nach dem Speichern der Einstellungen neu.
-- JS arbeitet Aufträge nacheinander ab: Cache-Anfragen während eines laufenden Cache-Syncs werden zusammengefasst; bei Tagesanfragen zählt nur die zuletzt angeforderte. Tagesanfragen senden keinen SYNCING-Status.
-- Die Uhr übernimmt eine neue Liste nur, wenn bei `MSG_TYPE = 2` alle `EVT_COUNT` Termine angekommen sind – sonst bleibt der alte Cache.
-- Jede Nachricht außer 4 schließt das Login-Fenster auf der Uhr.
-- Texte für die Uhr kein „…“-Zeichen verwenden, sondern `...` (Font-Abdeckung).
-- **Sprache:** Alle sichtbaren Texte zweisprachig – Uhr über `tr(STR_...)` in `i18n.c`, Handy über `i18n.t()` in `i18n.js`. Neue Texte immer in beiden Sprachen anlegen. Englisches Datum: „Thu Oct 1“, deutsches: „Do 01.10.“. Vor dem ersten Settings-Empfang nimmt die Uhr ihre Systemsprache (`i18n_get_system_locale()`).
-- **Farben:** Schrift auf der Akzentfarbe, Grau für vergangene Termine und die Statuszeile werden aus Helligkeit von Akzent/Hintergrund automatisch gewählt (`theme.c`). Schwarz-Weiß-Uhren ignorieren die Farben.
+- **Exactly one sync per app start:** JS syncs on the `ready` event; the watch sends nothing at start but waits (status line "Updating...", timeout) and shows the cache until then. No manual refresh, no periodic reloading.
+- The watch sends `MSG_TYPE = 10` when paging to a day outside the cache (`REQ_DAY` = day) and when the briefing becomes due while the app is open (`REQ_DAY` = 0). Otherwise JS only reloads after the settings are saved.
+- JS processes jobs one after another: cache requests during a running cache sync are merged; for day requests only the most recent one counts. Day requests send no SYNCING status.
+- The watch only accepts a new list if all `EVT_COUNT` events have arrived at `MSG_TYPE = 2` – otherwise the old cache stays.
+- Every message except 4 closes the login window on the watch.
+- Texts for the watch must not use the "…" character but `...` (font coverage).
+- **Language:** All visible texts bilingual – watch via `tr(STR_...)` in `i18n.c`, phone via `i18n.t()` in `i18n.js`. Always add new texts in both languages. English date: "Thu Oct 1", German: "Do 01.10.". Before the first settings arrive the watch uses its system language (`i18n_get_system_locale()`).
+- **Colors:** Text on the accent color, gray for past events and the status line are chosen automatically from the brightness of accent/background (`theme.c`). Black-and-white watches ignore the colors.
 
 ## Watchapp (C)
-- **Leiste oben:** immer das Datum des angezeigten Tages („Heute, Do 01.10.“, „Morgen, …“, „Sa 03.10.“). Darunter nur bei Bedarf eine schmale Statuszeile (Section-Header, sonst Höhe 0): „Aktualisiere...“, „Lade Tag...“, „Offline - Stand HH:MM“ oder Fehlertext. Im Normalfall kein „Stand“.
-- `MenuLayer` darunter, eigene Zeilenzeichnung: jeder Termin als **Kasten mit Rahmen** (Farbe = Schriftfarbe, Radius 4; vergangene nur grau, wenn „Vergangene Termine ausgrauen“ an ist) und ~0,5 mm Luft dazwischen (`CARD_GAP` 4 px auf emery, 3 px sonst); Inhalt: Uhrzeit-Spanne (bzw. „Ganztägig“), Titel, Ort.
-- **Keine Auswahl von Anfang an:** Erst der erste Tastendruck (hoch/runter/Select) blendet die Auswahl ein (gefüllter Kasten in Akzentfarbe), ohne sie zu bewegen. Beim Tageswechsel wieder aus. Die MenuLayer-Highlight-Farben sind deshalb = Normalfarben; die Hervorhebung zeichnet `prv_draw_event` selbst.
-- **Tasten (alle Plattformen, eigene Click-Config):** hoch/runter = Auswahl, **lang drücken (400 ms) = vorheriger/nächster Tag**, Select = Details, Zurück = App beenden.
-- **Tagesansicht:** immer genau ein Tag (max. 12 Termine). Termine, die vor dem Tag begonnen haben, erscheinen mit.
-- **Touch (nur `PBL_TOUCH`, Pebble Time 2):**
-  - Vertikales Scrollen, Tippen und „rechts wischen = zurück“ in der Detailansicht macht die **Touch-Navigation von PebbleOS** (`app_touch_navigation_enable(true)`): Inhalt folgt dem Finger 1:1, mit Schwung; Tippen auf einen Termin öffnet ihn. **Kein eigenes stufenweises Scrollen** (wurde als unangenehm empfunden). Funktioniert nur, wenn die Touch-Navigation in den Uhr-Einstellungen eingeschaltet ist.
-  - Horizontal in der Tagesansicht wertet die App selbst aus (`touch_service_subscribe()`): links = nächster Tag, rechts = vorheriger Tag. Die Touch-Navigation meldet „rechts wischen“ zusätzlich als BACK-Taste → das Hauptfenster hat eine eigene Tastenbelegung (wie MenuLayer) und ignoriert BACK, solange der Finger liegt oder das Abheben < 600 ms her ist; echte Zurück-Taste beendet die App.
-  - Ob eine Geste den Tag wechselt, entscheidet das Fenster beim **Aufsetzen** des Fingers (nur Tagesansicht). Das System verarbeitet Touch-Events vor dem App-Handler; „rechts wischen“ in der Detailansicht schließt diese schon vor unserem Liftoff – sonst würde zusätzlich ein Tag zurückgeblättert.
-  - Blätterbereich: −60 bis +90 Tage. Ohne Touch (Einstellung aus oder andere Plattform): Tageswechsel per langem Tastendruck.
-  - Einstellung „Touch-Bedienung“ aus → `touch_service_unsubscribe()` + `app_touch_navigation_enable(false)`.
-  - Beim Tageswechsel gleitet die Liste herein (`ui_main_animate_day`: Frame-Animation des MenuLayers ab halber Breite, 220 ms, EaseOut; nächster Tag von rechts, vorheriger von links). Eine laufende Animation wird bei erneutem Wischen abgebrochen.
-- Tage im Cache (heute/morgen) kommen sofort; andere Tage fordert die Uhr an („Lade Tag...“, Timeout 15 s; ist der Sendepuffer belegt, bis zu 8 Versuche im 250-ms-Abstand). Tageslisten werden nur übernommen, wenn sie zum gerade angezeigten Tag gehören (verspätete Antworten werden verworfen). Um Mitternacht springt die Ansicht mit, wenn „heute“ angezeigt war.
-- Keine Aktions-Einträge (kein „Aktualisieren“/„Anmelden“) – bewusst entfernt.
-- Select/Tippen auf einem Termin → Detailfenster (Datum, Zeit, voller Titel, Ort, **Beschreibung**). Die Beschreibung wird beim Öffnen per `MSG_TYPE 12` nachgeladen („Lade Beschreibung...“, Timeout 8 s, Sende-Retry wie beim Tag). Ohne Handy-Verbindung/Timeout: „Die Beschreibung benötigt die Nähe zum Handy.“; leer: „Keine Beschreibung“. Nur im RAM, nie im Persist-Cache. AppMessage-Inbox der Uhr: 640 Byte. Schrift dort bewusst klein: emery Titel GOTHIC_24_BOLD, Zeit GOTHIC_18_BOLD, Rest GOTHIC_18 (andere Plattformen eine Stufe kleiner).
-- Minütlicher Tick → Ansicht neu berechnen (vergangene Termine, Tageswechsel).
-- **Cache:** jeder Termin unter eigenem Persist-Key (256-Byte-Limit pro Key) + Anzahl + Zeitstempel des letzten Syncs + Cache-Version. Beim Start sofort Cache anzeigen, dann aktualisieren.
-- **Speicherbudget:** Persistenter Speicher ist insgesamt ca. 4 KB pro App. Ein Termin belegt 160 Byte → **max. 16 Termine** im Cache (~2,6 KB) plus Settings. Nicht erhöhen, ohne nachzurechnen. Tagespuffer (12 Termine) nur im RAM.
-- Leerer Zustand: „Keine Termine heute“ bzw. „Keine Termine“; bei Fehlern der Fehlertext; ohne Daten/Verbindung „Keine Verbindung zum Handy.“
-- Timeout für eine Synchronisierung: 30 s (außer während des Logins), dann „Offline“.
+- **Top bar:** always the date of the displayed day ("Today, Thu Oct 1", "Tomorrow, …", "Sat Oct 3"). Below it, only when needed, a narrow status line (section header, otherwise height 0): "Updating...", "Loading day...", "Offline - as of HH:MM" or an error text. Normally no "as of".
+- `MenuLayer` below, own row drawing: each event as a **card with a border** (color = text color, radius 4; past events only gray when "Gray out past events" is on) with ~0.5 mm gap in between (`CARD_GAP` 4 px on emery, 3 px otherwise); content: time span (or "All day"), title, location.
+- **No selection at first:** Only the first button press (up/down/Select) shows the selection (filled card in the accent color) without moving it. Hidden again on day change. The MenuLayer highlight colors are therefore = normal colors; `prv_draw_event` draws the highlight itself.
+- **Buttons (all platforms, own click config):** up/down = selection, **long press (400 ms) = previous/next day**, Select = details, Back = exit the app.
+- **Day view:** always exactly one day (max. 12 events). Events that started before the day are included.
+- **Touch (only `PBL_TOUCH`, Pebble Time 2):**
+  - Vertical scrolling, tapping and "swipe right = back" in the detail view are done by the **PebbleOS touch navigation** (`app_touch_navigation_enable(true)`): content follows the finger 1:1, with momentum; tapping an event opens it. **No own stepped scrolling** (felt unpleasant). Only works when touch navigation is enabled in the watch settings.
+  - Horizontal gestures in the day view are evaluated by the app (`touch_service_subscribe()`): left = next day, right = previous day. Touch navigation additionally reports "swipe right" as a BACK press → the main window has its own click config (like MenuLayer) and ignores BACK while the finger is down or the liftoff was < 600 ms ago; the real Back button exits the app.
+  - Whether a gesture changes the day is decided by the window at **touchdown** (day view only). The system handles touch events before the app handler; "swipe right" in the detail view closes it before our liftoff – otherwise it would also page one day back.
+  - Paging range: −60 to +90 days. Without touch (setting off or other platform): change the day by long press.
+  - Setting "Touch control" off → `touch_service_unsubscribe()` + `app_touch_navigation_enable(false)`.
+  - On day change the list slides in (`ui_main_animate_day`: frame animation of the MenuLayer from half width, 220 ms, EaseOut; next day from the right, previous from the left). A running animation is aborted by another swipe.
+- Days in the cache (today/tomorrow) appear instantly; other days are requested by the watch ("Loading day...", timeout 15 s; if the outbox is busy, up to 8 attempts 250 ms apart). Day lists are only accepted if they belong to the currently displayed day (late answers are discarded). At midnight the view follows if "today" was displayed.
+- No action entries (no "Refresh"/"Sign in") – removed on purpose.
+- Select/tap on an event → detail window (date, time, full title, location, **description**). The description is loaded when opened via `MSG_TYPE 12` ("Loading description...", timeout 8 s, send retry like for days). Without phone connection/timeout: "The description needs the phone nearby."; empty: "No description". Only in RAM, never in the persist cache. Watch AppMessage inbox: 640 bytes. Fonts there deliberately small: emery title GOTHIC_24_BOLD, time GOTHIC_18_BOLD, rest GOTHIC_18 (other platforms one step smaller).
+- Minute tick → recompute the view (past events, day change).
+- **Auto close (`idle.c`):** timer is restarted by every interaction (buttons in all windows, scrolling in the details, touch liftoff); when it fires the app exits (`window_stack_pop_all`). Timeout from `auto_close_min`, 60 s on a briefing launch, paused while the login code is shown.
+- **Cache:** each event under its own persist key (256-byte limit per key) + count + timestamp of the last sync + cache version. Show the cache immediately at start, then update.
+- **Storage budget:** Persistent storage is about 4 KB per app in total. One event takes 160 bytes → **max. 16 events** in the cache (~2.6 KB) plus settings. Do not increase without recalculating. Day buffer (12 events) only in RAM.
+- Empty state: "No events today" or "No events"; on errors the error text; without data/connection "No connection to the phone."
+- Timeout for a sync: 30 s (except during sign-in), then "Offline".
 
-## Termine verschieben (opt-in)
-- Nur wenn in den Einstellungen eingeschaltet. Verschiebbar (`lib.isMovable`): `isOrganizer` und – bei „Erlaubt für“ = `solo` – keine Teilnehmer (Räume zählen als Teilnehmer). Einladungen anderer nie.
-- Teilnehmer zählen ohne den Organisator selbst (`lib.countAttendees`: Adresse = `organizer.emailAddress` oder `status.response == 'organizer'` wird ignoriert) – Outlook listet den Organisator teils in `attendees`; sonst wäre im `solo`-Modus nichts verschiebbar (in der Praxis so aufgetreten).
-- `EVT_FLAGS`-Bits für die Diagnose: 1 = verschiebbar, 2 = nicht Organisator, 4 = hat Teilnehmer, 8 = Verschieben am Handy an. Die Detailansicht zeigt bei eingeschaltetem Verschieben den Grund, warum ein Termin nicht verschiebbar ist (grau), bzw. „Einstellungen fehlen auf der Uhr“.
-- Uhr: Detailansicht zeigt „Select: Verschieben“ (Akzentfarbe); Select → `ui_move`: Liste der freigegebenen Optionen mit Zieldatum/-zeit (+1 Stunde nicht bei ganztägig) → Bestätigung „Verschieben auf …?“ (Select = Ja, Zurück = Nein) → „Verschiebe...“ (Timeout 12 s, Sende-Retry) → „Verschoben auf …“ + Vibration, nach 1,5 s zurück zur Tagesansicht; Fehler bleiben stehen (Doppelvibration).
-- Handy: prüft Berechtigung erneut (Index `notes` speichert id/start/end/allDay/movable), dann `PATCH /me/events/{id}` mit neuem start/end (UTC; Tage behalten die lokale Uhrzeit, auch über DST; ganztägig: Datum + `T00:00:00`, `timeZone: UTC`). Danach `sync(true)`; die Uhr verwirft den Tagespuffer und lädt den angezeigten Tag neu.
-- Serientermine: verschoben wird nur das eine Vorkommen (Graph legt eine Ausnahme an).
+## Moving events (opt-in)
+- Only when enabled in the settings. Movable (`lib.isMovable`): `isOrganizer` and – with "Moving allowed for" = `solo` – no attendees (rooms count as attendees). Never invitations from others.
+- Attendees are counted without the organizer (`lib.countAttendees`: address = `organizer.emailAddress` or `status.response == 'organizer'` is ignored) – Outlook sometimes lists the organizer in `attendees`; otherwise nothing would be movable in `solo` mode (happened in practice).
+- `EVT_FLAGS` bits for diagnostics: 1 = movable, 2 = not organizer, 4 = has attendees, 8 = moving on at the phone. With moving on, the detail view shows why an event cannot be moved (gray), or "settings missing on the watch".
+- Watch: detail view shows "Select: Move" (accent color); Select → `ui_move`: list of the enabled options with target date/time (+1 hour not for all-day) → confirmation "Move to …?" (Select = yes, Back = no) → "Moving..." (timeout 12 s, send retry) → "Moved to …" + vibration, back to the day view after 1.5 s; errors stay visible (double vibration).
+- Phone: checks permission again (index `notes` stores id/start/end/allDay/movable), then `PATCH /me/events/{id}` with new start/end (UTC; days keep the local time, also across DST; all-day: date + `T00:00:00`, `timeZone: UTC`). Then `sync(true)`; the watch discards the day buffer and reloads the displayed day.
+- Recurring events: only the single occurrence is moved (Graph creates an exception).
 
-## Tägliches Briefing (Wakeup-API)
-- `wakeup_schedule()` immer nur für den **nächsten** Briefing-Zeitpunkt (berücksichtigt Wochentage); vorher `wakeup_cancel_all()`.
-- Neu planen: bei jedem App-Start, nach jeder Settings-Änderung und bei jedem Wakeup.
-- Kollision (`E_RANGE`): bis zu 5× je +1 Minute versuchen.
-- Start mit `APP_LAUNCH_WAKEUP` (oder Wakeup bei offener App, dann Sprung auf heute): kurz vibrieren, frische Daten anfordern (Timeout 10 s), sonst Cache mit „Offline · Stand …“ anzeigen. App nach 60 s ohne Interaktion selbst schließen (nur beim Wakeup-Start).
-- Abend-Caching ist über den Abfragezeitraum „heute + morgen“ abgedeckt.
+## Daily briefing (Wakeup API)
+- `wakeup_schedule()` only ever for the **next** briefing time (respects weekdays); `wakeup_cancel_all()` first.
+- Reschedule: on every app start, after every settings change and on every wakeup.
+- Collision (`E_RANGE`): up to 5 attempts, +1 minute each.
+- Launch with `APP_LAUNCH_WAKEUP` (or wakeup while the app is open, then jump to today): short vibration, request fresh data (timeout 10 s), otherwise show the cache with "Offline - as of …". The app closes itself after 60 s without interaction (wakeup launch only).
+- Evening caching is covered by the query range "today + tomorrow".
 
-## Firmenkonten & Einschränkungen
-Für Privatkonten (outlook.com/hotmail) und kleine Firmen ohne eigene Richtlinien funktioniert der Login in der Regel. In Firmen-Tenants gibt es drei unabhängige Hürden:
+## Work accounts & limitations
+Sign-in usually works for personal accounts (outlook.com/hotmail) and small organizations without own policies. Organization tenants have three independent hurdles:
 
-1. **Einwilligung (Consent):** Nutzer-Einwilligung ist oft abgeschaltet oder auf „verifizierte Herausgeber + risikoarme Berechtigungen“ beschränkt; `Calendars.Read` zählt standardmäßig nicht als risikoarm. Neue Multi-Tenant-Apps ohne verifizierten Herausgeber dürfen seit 11/2020 nicht mehr von Nutzern freigegeben werden.
-   → `AADSTS65001`, `AADSTS90094`, `AADSTS90095` → STATUS 3, „Deine Firmen-IT muss die App freigeben.“
-2. **Conditional Access:** Device Code Flow kann per Richtlinie („Authentifizierungsflüsse“) gesperrt sein – Microsoft empfiehlt das wegen Phishing-Missbrauch. „Konformes Gerät“ ist im Device Code Flow in der Regel nicht erfüllbar; „Genehmigte Client-App“ und Standort-Regeln blockieren ebenfalls.
-   → `AADSTS53000`, `AADSTS53001`, `AADSTS53002`, `AADSTS53003`, `AADSTS50097` → STATUS 4, „Firmenrichtlinie blockiert diese Anmeldung.“ Dafür gibt es keinen Workaround in der App.
-3. **Token-Laufzeit:** „Anmeldehäufigkeit“-Richtlinien erzwingen regelmäßige Neuanmeldung (`interaction_required`/`invalid_grant`) → STATUS 2. Für das Briefing praktisch unbrauchbar.
+1. **Consent:** User consent is often disabled or limited to "verified publishers + low-risk permissions"; `Calendars.Read` is not low-risk by default. Since 11/2020 users can no longer consent to new multi-tenant apps without a verified publisher.
+   → `AADSTS65001`, `AADSTS90094`, `AADSTS90095` → STATUS 3, "Your IT admin must approve this app."
+2. **Conditional Access:** The device code flow can be blocked by policy ("authentication flows") – Microsoft recommends this because of phishing abuse. "Compliant device" usually cannot be satisfied in the device code flow; "approved client app" and location rules block as well.
+   → `AADSTS53000`, `AADSTS53001`, `AADSTS53002`, `AADSTS53003`, `AADSTS50097` → STATUS 4, "Company policy blocks this sign-in." There is no workaround in the app.
+3. **Token lifetime:** "Sign-in frequency" policies force regular re-sign-in (`interaction_required`/`invalid_grant`) → STATUS 2. Practically unusable for the briefing.
 
-| Kontotyp | Erwartung |
+| Account type | Expectation |
 |---|---|
-| Privates Microsoft-Konto | funktioniert |
-| Kleinfirma ohne eigene Richtlinien | meist ok, abhängig von der Consent-Einstellung |
-| Mittelstand mit IT-Dienstleister | unsicher |
-| Konzern mit Intune / Conditional Access | scheitert fast sicher |
+| Personal Microsoft account | works |
+| Small business without own policies | mostly ok, depends on the consent setting |
+| Mid-size company with IT provider | uncertain |
+| Enterprise with Intune / Conditional Access | almost certainly fails |
 
-Positionierung bei Veröffentlichung: primär Privatkonten und kleine Firmen, nicht „Office 365 im Konzern“. Vor dem Store: Login mit einem fremden Test-Tenant (inkl. aktivierter Device-Code-Sperre) prüfen.
+Positioning for publication: primarily personal accounts and small organizations, not "Office 365 in the enterprise". Before the store: test sign-in with a foreign test tenant (including an enabled device code block).
 
-## Nicht-Ziele
-- Kein eigener Server/Proxy, keine Timeline-Pins.
-- Keine Schreibzugriffe auf den Kalender – **einzige Ausnahme:** „Termine verschieben“ (opt-in, nur eigene Termine, s. „Termine verschieben“). Kein Anlegen, Löschen, Annehmen/Ablehnen.
-- Keine anderen Kalenderquellen (Google, CalDAV) in Version 1. Graph-spezifischer Code bleibt in `index.js`/`lib.js` gekapselt, damit später weitere Quellen andocken können.
+## Non-goals
+- No own server/proxy, no timeline pins.
+- No write access to the calendar – **only exception:** "Moving events" (opt-in, own events only, see "Moving events"). No creating, deleting, accepting/declining.
+- No other calendar sources (Google, CalDAV) in version 1. Graph-specific code stays encapsulated in `index.js`/`lib.js` so other sources can be added later.
 
-## Reihenfolge der Umsetzung
-1. ✅ Grundgerüst Watchapp + MenuLayer
-2. ✅ Device Code Flow + Token-Handling in PebbleKit JS
-3. ✅ Graph-Abfrage + AppMessage-Übertragung
-4. ✅ Cache auf der Uhr
-5. ✅ Clay-Einstellungen inkl. dynamischer Kalenderliste
-6. ✅ Mehrere Kalender; Tagesansicht mit Blättern per Touch (ersetzt die Modi „Nur heute“/„Nächste N“)
-7. ✅ Tägliches Briefing per Wakeup
-8. ✅ Fehlerzustände (erste Fassung) – Feinschliff nach Test auf echter Hardware
+## Implementation order
+1. ✅ Watchapp skeleton + MenuLayer
+2. ✅ Device code flow + token handling in PebbleKit JS
+3. ✅ Graph query + AppMessage transfer
+4. ✅ Cache on the watch
+5. ✅ Clay settings incl. dynamic calendar list
+6. ✅ Several calendars; day view with paging by touch (replaces the "Today only"/"Next N" modes)
+7. ✅ Daily briefing via wakeup
+8. ✅ Error states (first version) – fine-tuning after testing on real hardware
+9. ✅ Moving events, colors, English, auto close
 
-Stand: Vom Projektinhaber mit dem echten SDK gebaut und **auf der Pebble Time 2 im Alltag getestet** (Anzeige, Touch, Beschreibung, Farben, Sprache, Verschieben eigener Termine mit und ohne Teilnehmer funktionieren). Die Claude-Build-Umgebung hat keinen Zugriff auf den SDK-Server: dort wird C gegen den Stub-Header kompiliert und JS per Node-Tests geprüft – Build-Fehler aus dem echten SDK kommen daher erst beim Projektinhaber zum Vorschein.
+Status: built by the owner with the real SDK and **tested in daily use on the Pebble Time 2** (display, touch, description, colors, language, moving own events with and without attendees work). The Claude build environment has no access to the SDK server: there C is compiled against the stub header and JS is checked with Node tests – build errors from the real SDK therefore only show up for the owner.
 
-## Vor der Store-Veröffentlichung
-- Publisher-Verifizierung in Entra ID (Microsoft-Partner-ID) – Voraussetzung, dass Nutzer in fremden Tenants überhaupt selbst zustimmen können.
-- Store-Beschreibung: klarer Hinweis auf die Einschränkungen bei Firmenkonten (s. o.).
-- Datenschutzhinweis: keine Datenverarbeitung durch den Entwickler, alles bleibt am Gerät.
+## Before the store release
+- Publisher verification in Entra ID (Microsoft partner ID) – a precondition for users in other tenants to consent themselves at all.
+- Store description: clear note on the limitations with work accounts (see above) – `store/listing.md`.
+- Privacy policy: no data processing by the developer, everything stays on the device – `docs/privacy.md`.
+- Screenshots (emery), possibly add the `flint` platform (Pebble 2 Duo).
 
-## App-Name
-- **„Kalender für Office 365“** (`displayName` in `package.json`, Überschrift der Einstellungsseite, README). „Office 365“ ist eine Microsoft-Marke – im Store-Text klar als „für“ formulieren (kein offizielles Microsoft-Produkt).
+## App name
+- **"Calendar for Office 365"** (`displayName` in `package.json`, heading of the settings page, README). "Office 365" is a Microsoft trademark – phrase it clearly as "for" in the store text (not an official Microsoft product).

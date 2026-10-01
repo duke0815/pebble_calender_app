@@ -9,22 +9,22 @@
 #define PERSIST_KEY_CACHE_DAYS 6
 #define PERSIST_KEY_EVENT_0    100
 
-// Cache: heute + morgen (persistent)
+// Cache: today + tomorrow (persistent)
 static CalEvent s_cache[MAX_CACHE_EVENTS];
 static int s_cache_count;
 static time_t s_cache_day;
 static int s_cache_days;
 static time_t s_last_sync;
 
-// Tagespuffer: ein beliebiger anderer Tag (nur RAM)
+// Day buffer: any other single day (RAM only)
 static CalEvent s_day[MAX_DAY_EVENTS];
 static int s_day_count;
 static time_t s_day_key;
 
 static CalEvent s_incoming[MAX_CACHE_EVENTS];
-static uint32_t s_incoming_mask;  // Bit i = Termin i empfangen
+static uint32_t s_incoming_mask;  // bit i = event i received
 
-// Ansicht
+// View
 static time_t s_view_day;
 static const CalEvent *s_view[MAX_DAY_EVENTS];
 static uint8_t s_view_count;
@@ -36,8 +36,8 @@ time_t time_make_local(time_t base, int day_offset, int hour, int minute) {
   tm.tm_min = minute;
   tm.tm_sec = 0;
   time_t result = mktime(&tm);
-  // tm_isdst stammt von base; liegt eine Zeitumstellung dazwischen, ist das Ergebnis
-  // um eine Stunde verschoben -> gegen die gewuenschte Uhrzeit korrigieren.
+  // tm_isdst comes from base; if a DST change lies in between, the result is
+  // off by one hour -> correct it against the requested time of day.
   struct tm *check = localtime(&result);
   int diff = (hour - check->tm_hour) * 3600 + (minute - check->tm_min) * 60;
   if (diff > 12 * 3600) diff -= 24 * 3600;
@@ -66,7 +66,7 @@ void events_load_cache(void) {
   }
   for (int i = 0; i < count; i++) {
     if (persist_read_data(PERSIST_KEY_EVENT_0 + i, &s_cache[i], sizeof(CalEvent)) != (int)sizeof(CalEvent)) {
-      return;  // Cache unvollstaendig -> verwerfen
+      return;  // cache incomplete -> discard
     }
     s_cache[i].title[TITLE_LEN - 1] = '\0';
     s_cache[i].location[LOCATION_LEN - 1] = '\0';
@@ -116,7 +116,7 @@ bool events_commit(int count, time_t list_day, int list_days) {
   uint32_t expected = (count <= 0) ? 0 : ((1u << count) - 1);
   if (count < 0 || list_day == 0 || (s_incoming_mask & expected) != expected ||
       (list_days < 2 && list_day != s_view_day)) {
-    // unvollständig, oder verspätete Antwort für einen Tag, der nicht mehr angezeigt wird
+    // incomplete, or a late reply for a day that is no longer displayed
     APP_LOG(APP_LOG_LEVEL_WARNING, "Liste verworfen");
     s_incoming_mask = 0;
     return false;
@@ -138,7 +138,7 @@ bool events_commit(int count, time_t list_day, int list_days) {
 }
 
 // ---------------------------------------------------------------------------
-// Ansicht
+// View
 
 static bool prv_cache_covers(time_t day) {
   if (s_cache_days <= 0 || s_cache_day == 0) return false;

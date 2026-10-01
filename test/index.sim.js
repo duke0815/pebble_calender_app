@@ -1,5 +1,5 @@
-// Simulation von src/pkjs/index.js mit gemocktem Pebble, XMLHttpRequest und localStorage.
-// Ausführen: TZ=Europe/Vienna node test/index.sim.js
+// Simulation of src/pkjs/index.js with mocked Pebble, XMLHttpRequest and localStorage.
+// Run: TZ=Europe/Vienna node test/index.sim.js
 var assert = require('assert');
 var fs = require('fs');
 var path = require('path');
@@ -20,7 +20,7 @@ global.Pebble = {
   addEventListener: function(name, fn) { (listeners[name] = listeners[name] || []).push(fn); },
   sendAppMessage: function(msg, ok, fail) {
     setTimeout(function() {
-      // Erste Termin-Nachricht einmal ablehnen -> Retry muss greifen
+      // Reject the first event message once -> retry must kick in
       if (msg.MSG_TYPE === 1 && nackOnce) { nackOnce = false; fail({}); return; }
       sent.push(msg);
       ok({});
@@ -81,7 +81,7 @@ global.XMLHttpRequest.prototype = {
   send: function(body) {
     var self = this;
     if (/graph\.microsoft\.com/.test(self.url)) {
-      assert.ok(/^Bearer /.test(self.headers.Authorization), 'Authorization fehlt');
+      assert.ok(/^Bearer /.test(self.headers.Authorization), 'Authorization missing');
       assert.strictEqual(self.headers.Prefer, 'outlook.timezone="UTC"');
     }
     setTimeout(function() {
@@ -106,7 +106,7 @@ Module._load = function(request) {
   return origLoad.apply(this, arguments);
 };
 
-// index.js mit Test-Client-ID laden
+// Load index.js with a test client ID
 var file = path.join(__dirname, '../src/pkjs/index.js');
 var src = fs.readFileSync(file, 'utf8').replace(/var CLIENT_ID = '[^']*';/, "var CLIENT_ID = 'test-client';");
 var m = new Module(file, module);
@@ -114,24 +114,24 @@ m.filename = file;
 m.paths = Module._nodeModulePaths(path.dirname(file));
 m._compile(src, file);
 
-// --- Ablauf ------------------------------------------------------------------
+// --- Flow ------------------------------------------------------------------
 function waitFor(cond, ms, cb) {
   var start = Date.now();
   (function check() {
     if (cond()) return cb();
-    if (Date.now() - start > ms) { console.log(JSON.stringify(sent), requests); throw new Error('Timeout beim Warten'); }
+    if (Date.now() - start > ms) { console.log(JSON.stringify(sent), requests); throw new Error('Timeout while waiting'); }
     setTimeout(check, 5);
   })();
 }
 
 fire('ready');
-// Doppelte Anfrage der Uhr während laufender Synchronisierung -> nur Login-Code erneut
+// Duplicate request from the watch during a running sync -> only resend the login code
 fire('appmessage', { payload: { MSG_TYPE: 10 } });
 
 waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; }); }, 3000, function() {
   var types = sent.map(function(m) { return m.MSG_TYPE; });
-  assert.strictEqual(types[0], 5, 'zuerst Settings');
-  assert.strictEqual(types[1], 3, 'dann Status');
+  assert.strictEqual(types[0], 5, 'settings first');
+  assert.strictEqual(types[1], 3, 'then status');
   var login = sent.filter(function(m) { return m.MSG_TYPE === 4; });
   assert.ok(login.length >= 1);
   assert.strictEqual(login[0].LOGIN_URL, 'microsoft.com/devicelogin');
@@ -151,9 +151,9 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
 
   var auth = JSON.parse(store.auth);
   assert.strictEqual(auth.refresh, 'RT');
-  assert.strictEqual(requests.filter(function(r) { return /devicecode$/.test(r); }).length, 1, 'nur ein Login');
+  assert.strictEqual(requests.filter(function(r) { return /devicecode$/.test(r); }).length, 1, 'only one login');
 
-  // Einstellungen speichern -> neue Synchronisierung mit Settings an die Uhr
+  // Save settings -> new sync with settings sent to the watch
   waitFor(function() { return !!store.calendars; }, 1000, function() {
     fire('showConfiguration');
     waitFor(function() { return !!global.openedUrl; }, 1000, function() {
@@ -175,14 +175,15 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
         assert.strictEqual(settingsMsg.SET_MODE, undefined);
         assert.strictEqual(settingsMsg.SET_LANG, 1);
         assert.strictEqual(settingsMsg.SET_TOUCH, 1);
+        assert.strictEqual(settingsMsg.SET_AUTO_CLOSE, 5);
         assert.strictEqual(settingsMsg.SET_GRAY_PAST, 0);
         assert.strictEqual(settingsMsg.SET_COLOR_ACCENT, 0xAA0000);
         assert.strictEqual(settingsMsg.SET_COLOR_BG, 0xFFFFFF);
         var statusMsg = sent.filter(function(m) { return m.MSG_TYPE === 3; })[0];
         assert.strictEqual(statusMsg.STATUS_TEXT, 'Updating...');
         assert.ok(requests.some(function(r) { return /\/me\/calendars\/cal1\/calendarView$/.test(r); }),
-                  'ausgewählter Kalender wird abgefragt');
-        // Blättern: zwei Tage schnell hintereinander anfordern
+                  'selected calendar is queried');
+        // Paging: request two days in quick succession
         sent = [];
         var d1 = todayStart + 2 * 86400;
         var d2 = todayStart - 86400;
@@ -193,8 +194,8 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
           assert.strictEqual(ends[0].LIST_DAY, d1);
           assert.strictEqual(ends[0].LIST_DAYS, 1);
           assert.strictEqual(ends[1].LIST_DAY, d2);
-          assert.ok(!sent.some(function(m) { return m.MSG_TYPE === 3; }), 'kein Status beim Blättern');
-          // Beschreibung anfordern: bekannte Kennung -> Text, unbekannte -> leer
+          assert.ok(!sent.some(function(m) { return m.MSG_TYPE === 3; }), 'no status when paging');
+          // Request description: known key -> text, unknown -> empty
           sent = [];
           var key = events[1].EVT_KEY;
           fire('appmessage', { payload: { MSG_TYPE: 12, EVT_KEY: key } });
@@ -205,9 +206,9 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
             assert.strictEqual(notes[0].NOTE_TEXT, 'Bitte Status vorbereiten.');
             assert.strictEqual(notes[1].EVT_KEY, 4711);
             assert.strictEqual(notes[1].NOTE_TEXT, '');
-            assert.ok(/Calendars\.Read /.test(lastScope + ' ') && !/ReadWrite/.test(lastScope), 'ohne Verschieben nur Leserechte');
+            assert.ok(/Calendars\.Read /.test(lastScope + ' ') && !/ReadWrite/.test(lastScope), 'read-only access without moving');
 
-            // Verschieben einschalten -> einmalige Neuanmeldung mit Schreibrechten
+            // Enable moving -> one-time re-login with write access
             sent = [];
             var polls = tokenPolls;
             fire('showConfiguration');
@@ -217,16 +218,16 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
                 CFG_MOVE_OPTS: { value: [false, true, false, true] }
               })) });
               waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; }); }, 3000, function() {
-                assert.ok(/Calendars\.ReadWrite/.test(lastScope), 'Login mit Schreibrechten');
-                assert.ok(tokenPolls > polls, 'neue Anmeldung');
-                assert.ok(sent.some(function(m) { return m.MSG_TYPE === 4; }), 'Login-Code an die Uhr');
+                assert.ok(/Calendars\.ReadWrite/.test(lastScope), 'login with write access');
+                assert.ok(tokenPolls > polls, 'new sign-in');
+                assert.ok(sent.some(function(m) { return m.MSG_TYPE === 4; }), 'login code sent to the watch');
                 var s5 = sent.filter(function(m) { return m.MSG_TYPE === 5; }).pop();
                 assert.strictEqual(s5.SET_MOVE_OPTS, 10);
                 var ev = sent.filter(function(m) { return m.MSG_TYPE === 1 && m.EVT_TITLE === 'Standup'; })[0];
-                assert.strictEqual(ev.EVT_FLAGS & 1, 1, 'eigener Termin ohne Teilnehmer ist verschiebbar');
-                assert.strictEqual(ev.EVT_FLAGS & 8, 8, 'Verschieben am Handy an');
+                assert.strictEqual(ev.EVT_FLAGS & 1, 1, 'own event without attendees is movable');
+                assert.strictEqual(ev.EVT_FLAGS & 8, 8, 'moving enabled on the phone');
 
-                // 1 Tag später -> PATCH; 1 Stunde später (nicht freigegeben) -> abgelehnt
+                // 1 day later -> PATCH; 1 hour later (not allowed) -> denied
                 sent = [];
                 fire('appmessage', { payload: { MSG_TYPE: 13, EVT_KEY: ev.EVT_KEY, MOVE_OPT: 1 } });
                 fire('appmessage', { payload: { MSG_TYPE: 13, EVT_KEY: ev.EVT_KEY, MOVE_OPT: 0 } });
@@ -234,7 +235,7 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
                   var results = sent.filter(function(m) { return m.MSG_TYPE === 7; });
                   var denied = results.filter(function(r) { return !r.MOVE_OK; })[0];
                   var okRes = results.filter(function(r) { return r.MOVE_OK; })[0];
-                  assert.ok(denied && okRes, 'ein Erfolg, eine Ablehnung');
+                  assert.ok(denied && okRes, 'one success, one denial');
                   assert.strictEqual(patches.length, 1);
                   assert.ok(/\/me\/events\/evt-standup$/.test(patches[0].url));
                   assert.deepStrictEqual(patches[0].body, {

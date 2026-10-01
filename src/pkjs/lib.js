@@ -1,5 +1,5 @@
-// Reine Logik ohne Pebble-/Netzwerk-Abhaengigkeiten – mit Node testbar (test/lib.test.js).
-// ES5, da PebbleKit JS nicht ueberall moderne Syntax unterstuetzt.
+// Pure logic without Pebble/network dependencies - testable with Node (test/lib.test.js).
+// ES5, since PebbleKit JS does not support modern syntax everywhere.
 
 var i18n = require('./i18n');
 
@@ -16,16 +16,16 @@ var MSG = {
   MOVE: 13
 };
 
-// Verschiebe-Optionen: Index = MOVE_OPT im Protokoll = Bit in settings.moveOptions
+// Move options: index = MOVE_OPT in the protocol = bit in settings.moveOptions
 var MOVE_OPTIONS = [
-  { hours: 1 },   // 0: 1 Stunde später
-  { days: 1 },    // 1: 1 Tag später
-  { days: 2 },    // 2: 2 Tage später
-  { days: 7 },    // 3: 1 Woche später
-  { weekday: 1 }  // 4: nächster Montag (ist der Termin montags: Montag in einer Woche)
+  { hours: 1 },   // 0: 1 hour later
+  { days: 1 },    // 1: 1 day later
+  { days: 2 },    // 2: 2 days later
+  { days: 7 },    // 3: 1 week later
+  { weekday: 1 }  // 4: next Monday (if the event is on a Monday: Monday a week later)
 ];
 
-// Tage bis zum nächsten Wochentag wday (0 = Sonntag) nach dem Datum des Termins, 1..7
+// Days until the next weekday wday (0 = Sunday) after the event's date, 1..7
 function daysUntilWeekday(sec, wday) {
   var current = new Date(sec * 1000).getDay();
   return ((wday - current + 6) % 7) + 1;
@@ -41,31 +41,32 @@ var STATUS = {
   CONFIG: 7
 };
 
-// Muss zu src/c/protocol.h passen
-var MAX_DAY_EVENTS = 12;      // Termine pro Tag
-var MAX_CACHE_EVENTS = 16;    // Cache-Liste heute + morgen
+// Must match src/c/protocol.h
+var MAX_DAY_EVENTS = 12;      // events per day
+var MAX_CACHE_EVENTS = 16;    // cache list today + tomorrow
 var CACHE_DAYS = 2;
 var TITLE_CHARS = 80;
-var TITLE_BYTES = 95;         // Puffer auf der Uhr: 96 inkl. '\0'
+var TITLE_BYTES = 95;         // buffer on the watch: 96 incl. '\0'
 var LOCATION_CHARS = 40;
-var LOCATION_BYTES = 47;      // Puffer auf der Uhr: 48 inkl. '\0'
+var LOCATION_BYTES = 47;      // buffer on the watch: 48 incl. '\0'
 var NOTE_CHARS = 300;
-var NOTE_BYTES = 400;         // passt in eine AppMessage (Inbox 640 Byte auf der Uhr)
+var NOTE_BYTES = 400;         // fits in one AppMessage (640-byte inbox on the watch)
 
 var DEFAULT_SETTINGS = {
-  calendars: [],              // leere Liste = Standardkalender
+  calendars: [],              // empty list = default calendar
   showAllDay: true,
   hideDeclined: true,
   briefEnabled: false,
   briefTime: '07:00',
-  briefDays: 62,              // Bitmaske, Bit 0 = Sonntag; Mo-Fr
+  briefDays: 62,              // bitmask, bit 0 = Sunday; Mon-Fri
   language: 'auto',           // 'auto' | 'de' | 'en'
-  touch: true,                // Touch-Bedienung auf der Uhr (Pebble Time 2)
-  grayPast: false,            // vergangene Termine grau anzeigen
-  moveEnabled: false,         // Termine verschieben (braucht Calendars.ReadWrite)
-  moveScope: 'solo',          // 'solo' = eigene Termine ohne Teilnehmer, 'own' = alle eigenen
-  moveOptions: 10,            // Bitmaske über MOVE_OPTIONS; Default: 1 Tag + 1 Woche
-  accentColor: 0x0055AA,      // 0xRRGGBB (Pebble-Palette)
+  touch: true,                // touch control on the watch (Pebble Time 2)
+  grayPast: false,            // show past events in gray
+  autoClose: 5,               // minutes without use until the app exits (0 = never)
+  moveEnabled: false,         // move events (requires Calendars.ReadWrite)
+  moveScope: 'solo',          // 'solo' = own events without attendees, 'own' = all own events
+  moveOptions: 10,            // bitmask over MOVE_OPTIONS; default: 1 day + 1 week
+  accentColor: 0x0055AA,      // 0xRRGGBB (Pebble palette)
   textColor: 0x000000,
   bgColor: 0xFFFFFF
 };
@@ -88,8 +89,14 @@ function mergeSettings(stored) {
   return result;
 }
 
+// Minutes until the app exits without use; only the offered values, otherwise the default.
+function autoCloseMinutes(v) {
+  var n = parseInt(v, 10);
+  return (n === 0 || n === 2 || n === 5 || n === 10) ? n : DEFAULT_SETTINGS.autoClose;
+}
+
 // ---------------------------------------------------------------------------
-// Texte
+// Text
 
 function utf8Length(ch) {
   var c = ch.codePointAt ? ch.codePointAt(0) : ch.charCodeAt(0);
@@ -99,7 +106,7 @@ function utf8Length(ch) {
   return 4;
 }
 
-// Zerlegt in Codepoints (Surrogatpaare bleiben zusammen).
+// Splits into code points (surrogate pairs stay together).
 function codePoints(str) {
   var result = [];
   for (var i = 0; i < str.length; i++) {
@@ -114,7 +121,7 @@ function codePoints(str) {
   return result;
 }
 
-// Kuerzt auf maxChars Zeichen UND maxBytes UTF-8-Bytes, haengt ggf. "..." an.
+// Truncates to maxChars characters AND maxBytes UTF-8 bytes, appending "..." if needed.
 function truncate(str, maxChars, maxBytes) {
   str = String(str || '').replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
   var chars = codePoints(str);
@@ -136,16 +143,16 @@ function truncate(str, maxChars, maxBytes) {
 }
 
 // ---------------------------------------------------------------------------
-// Zeiten
+// Times
 
-// "2026-10-01T07:30:00.0000000" (UTC, ohne Z) -> Epoch-Sekunden
+// "2026-10-01T07:30:00.0000000" (UTC, without Z) -> epoch seconds
 function parseGraphUtc(dateTime) {
   var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(dateTime || '');
   if (!m) return NaN;
   return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) / 1000);
 }
 
-// Ganztaegig: nur das Datum verwenden -> lokale Mitternacht dieses Datums
+// All-day: use only the date -> local midnight of that date
 function parseGraphDateLocal(dateTime) {
   var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateTime || '');
   if (!m) return NaN;
@@ -160,7 +167,7 @@ function addDays(date, days) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 
-// Abfragezeitraum: days Tage ab lokaler Mitternacht von day
+// Query window: `days` days starting at local midnight of `day`
 function queryWindow(day, days) {
   var start = localDayStart(day);
   return { start: start, end: addDays(start, days) };
@@ -172,7 +179,7 @@ function parseTime(text) {
   return { hour: Math.min(23, +m[1]), minute: Math.min(59, +m[2]) };
 }
 
-// Clay-Checkboxen sind Mo..So, Bitmaske ist Bit 0 = Sonntag
+// Clay checkboxes are Mon..Sun, bitmask is bit 0 = Sunday
 function daysToMask(monFirst) {
   var mask = 0;
   for (var i = 0; i < 7; i++) {
@@ -190,10 +197,10 @@ function maskToDays(mask) {
 }
 
 // ---------------------------------------------------------------------------
-// Termine
+// Events
 
-// Kurze Kennung (32 Bit, nie 0) für die lange Graph-ID – damit fragt die Uhr die
-// Beschreibung an, ohne die ID speichern zu müssen (FNV-1a).
+// Short key (32 bits, never 0) for the long Graph ID - lets the watch request the
+// description without having to store the ID (FNV-1a).
 function eventKey(id) {
   var h = 0x811c9dc5;
   var s = String(id || '');
@@ -205,8 +212,8 @@ function eventKey(id) {
   return h === 0 ? 1 : h;
 }
 
-// Beschreibung (bodyPreview) für die Uhr aufbereiten: Teams-/Zoom-Einladungsblock
-// abschneiden, Leerzeilen zusammenfassen, Zeilenumbrüche behalten, kürzen.
+// Prepare the description (bodyPreview) for the watch: cut off the Teams/Zoom invitation
+// block, collapse blank lines, keep line breaks, truncate.
 function cleanNotes(text) {
   var s = String(text || '').replace(/\r\n?/g, '\n');
   var cut = s.search(/_{8,}|-{8,}|Microsoft Teams[- ]?(Besprechung|meeting|Meeting)/);
@@ -214,7 +221,7 @@ function cleanNotes(text) {
   s = s.split('\n').map(function(line) { return line.replace(/[ \t]+/g, ' ').trim(); }).join('\n');
   s = s.replace(/\n{3,}/g, '\n\n').trim();
   if (!s) return '';
-  // Kürzen wie truncate(), aber Zeilenumbrüche erhalten
+  // Truncate like truncate(), but keep line breaks
   var chars = codePoints(s);
   var bytes = 0;
   var out = '';
@@ -229,8 +236,8 @@ function cleanNotes(text) {
   return out;
 }
 
-// Teilnehmer ohne den Organisator selbst: Outlook führt den Organisator teils auch in
-// attendees (mit status.response = 'organizer') – der zählt nicht als "hat Teilnehmer".
+// Attendees excluding the organizer: Outlook sometimes lists the organizer in attendees
+// too (with status.response = 'organizer') - that does not count as "has attendees".
 function countAttendees(e) {
   var organizer = String((e.organizer && e.organizer.emailAddress && e.organizer.emailAddress.address) || '')
     .toLowerCase();
@@ -266,17 +273,17 @@ function normalizeEvent(e) {
 }
 
 // ---------------------------------------------------------------------------
-// Verschieben
+// Moving events
 
-// Nur eigene Termine (Organisator); je nach Einstellung nur ohne Teilnehmer.
-// Einladungen anderer sind nie verschiebbar.
+// Only own events (organizer); depending on the setting, only without attendees.
+// Invitations from others are never movable.
 function isMovable(e, settings) {
   if (!e || !settings.moveEnabled || !e.isOrganizer) return false;
   return settings.moveScope === 'own' || !e.attendees;
 }
 
-// EVT_FLAGS für die Uhr: Bit 0 verschiebbar; Gründe, warum nicht (für den Hinweis in der
-// Detailansicht): Bit 1 = nicht Organisator, Bit 2 = hat Teilnehmer, Bit 3 = Verschieben am Handy an
+// EVT_FLAGS for the watch: bit 0 movable; reasons why not (for the hint in the
+// detail view): bit 1 = not organizer, bit 2 = has attendees, bit 3 = moving enabled on the phone
 function moveFlags(e, settings) {
   var flags = 0;
   if (isMovable(e, settings)) flags |= 1;
@@ -290,8 +297,8 @@ function pad2(n) {
   return (n < 10 ? '0' : '') + n;
 }
 
-// Neue Zeiten (Epoch-Sekunden) für Option opt; Tage behalten die lokale Uhrzeit
-// (auch über die Zeitumstellung). null, wenn die Option nicht passt (Stunde bei ganztägig).
+// New times (epoch seconds) for option opt; day shifts keep the local time of day
+// (also across DST changes). null if the option does not apply (hour for all-day events).
 function shiftEvent(e, opt) {
   var o = MOVE_OPTIONS[opt];
   if (!o) return null;
@@ -317,7 +324,7 @@ function localDate(sec) {
   return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T00:00:00';
 }
 
-// Body für PATCH /me/events/{id}
+// Body for PATCH /me/events/{id}
 function graphMoveBody(e, opt) {
   var t = shiftEvent(e, opt);
   if (!t) return null;
@@ -329,9 +336,9 @@ function graphMoveBody(e, opt) {
            end: { dateTime: utcDateTime(t.end), timeZone: 'UTC' } };
 }
 
-// Filtert, sortiert und kuerzt die normalisierten Termine fuer die Uhr.
-// win = queryWindow(...): max. MAX_DAY_EVENTS pro Tag; bei mehreren Tagen (Cache)
-// insgesamt max. MAX_CACHE_EVENTS, wobei der erste Tag Vorrang hat.
+// Filters, sorts and truncates the normalized events for the watch.
+// win = queryWindow(...): max. MAX_DAY_EVENTS per day; for multiple days (cache)
+// max. MAX_CACHE_EVENTS in total, with the first day taking priority.
 function selectEvents(events, settings, win) {
   var winStart = Math.floor(win.start.getTime() / 1000);
   var winEnd = Math.floor(win.end.getTime() / 1000);
@@ -346,7 +353,7 @@ function selectEvents(events, settings, win) {
     if (e.allDay && !settings.showAllDay) return false;
     if (e.declined && settings.hideDeclined) return false;
     if (e.start >= winEnd || e.end <= winStart) return false;
-    // Gleicher Termin in mehreren Kalendern -> nur einmal
+    // Same event in multiple calendars -> only once
     var key = e.start + '|' + e.end + '|' + e.title;
     if (seen[key]) return false;
     seen[key] = true;
@@ -359,7 +366,7 @@ function selectEvents(events, settings, win) {
     return a.end - b.end;
   });
 
-  // Pro Tag zählen (Termine, die vorher begonnen haben, zählen zum ersten Tag)
+  // Count per day (events that started earlier count toward the first day)
   var perDay = dayStarts.map(function() { return 0; });
   var result = [];
   var total = dayStarts.length > 1 ? MAX_CACHE_EVENTS : MAX_DAY_EVENTS;
@@ -377,12 +384,12 @@ function selectEvents(events, settings, win) {
 }
 
 // ---------------------------------------------------------------------------
-// Fehler
+// Errors
 
 var ADMIN_CONSENT_CODES = ['65001', '90094', '90095'];
 var POLICY_CODES = ['53000', '53001', '53002', '53003', '50097'];
 
-// Liefert { code, text, clearTokens } fuer eine fehlgeschlagene Token-Antwort.
+// Returns { code, text, clearTokens } for a failed token response.
 function classifyAuthError(json) {
   json = json || {};
   var desc = String(json.error_description || '');
@@ -428,6 +435,7 @@ module.exports = {
   MAX_CACHE_EVENTS: MAX_CACHE_EVENTS,
   CACHE_DAYS: CACHE_DAYS,
   DEFAULT_SETTINGS: DEFAULT_SETTINGS,
+  autoCloseMinutes: autoCloseMinutes,
   mergeSettings: mergeSettings,
   truncate: truncate,
   parseGraphUtc: parseGraphUtc,

@@ -1,12 +1,12 @@
 #pragma once
 #include "events.h"
 
-// true, wenn der Termin verschoben werden darf und mindestens eine Option passt
+// true if the event may be moved and at least one option applies
 bool ui_move_available(const CalEvent *event);
-// Kurzer Grund, warum (noch) nicht verschoben werden kann, oder NULL (Verschieben aus
-// bzw. verschiebbar). Für den Hinweis in der Detailansicht.
+// Short reason why it cannot be moved (yet), or NULL (moving off
+// or movable). For the hint in the detail view.
 const char *ui_move_reason(const CalEvent *event);
-// Auswahl der Verschiebe-Optionen (mit Zieldatum) -> Bestätigung -> Ergebnis
+// Pick a move option (with target date) -> confirmation -> result
 void ui_move_show(const CalEvent *event);
-// Antwort vom Handy. Bei Erfolg schließen sich Auswahl, Bestätigung und Detailansicht.
+// Reply from the phone. On success the selection, confirmation and detail view close.
 void ui_move_result(int32_t key, bool ok, const char *text);

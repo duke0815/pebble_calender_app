@@ -1,4 +1,4 @@
-// Tests für src/pkjs/lib.js – Ausführen: TZ=Europe/Vienna node test/lib.test.js
+// Tests for src/pkjs/lib.js - run: TZ=Europe/Vienna node test/lib.test.js
 var assert = require('assert');
 var lib = require('../src/pkjs/lib');
 var config = require('../src/pkjs/config');
@@ -9,12 +9,12 @@ function test(name, fn) { tests.push({ name: name, fn: fn }); }
 function utf8Bytes(s) { return Buffer.byteLength(s, 'utf8'); }
 function local(y, m, d, h, min) { return Math.floor(new Date(y, m - 1, d, h || 0, min || 0).getTime() / 1000); }
 
-test('truncate: kurze Texte bleiben unverändert', function() {
+test('truncate: short texts stay unchanged', function() {
   assert.strictEqual(lib.truncate('Jour fixe', 48, 63), 'Jour fixe');
   assert.strictEqual(lib.truncate('  Zeile\n zwei ', 48, 63), 'Zeile zwei');
 });
 
-test('truncate: Zeichen- und Byte-Grenze, keine zerschnittenen Umlaute', function() {
+test('truncate: character and byte limit, no split umlauts', function() {
   var long = 'Ä'.repeat(60);
   var out = lib.truncate(long, 48, 63);
   assert.ok(utf8Bytes(out) <= 63, 'Bytes: ' + utf8Bytes(out));
@@ -31,15 +31,15 @@ test('parseGraphUtc', function() {
   assert.ok(isNaN(lib.parseGraphUtc('')));
 });
 
-test('Ganztägig: lokale Mitternacht des Datums, unabhängig von der Uhrzeit', function() {
+test('All-day: local midnight of the date, regardless of the time', function() {
   assert.strictEqual(lib.parseGraphDateLocal('2026-10-03T00:00:00.0000000'), local(2026, 10, 3));
 });
 
-test('Wochentage <-> Bitmaske', function() {
+test('Weekdays <-> bitmask', function() {
   var monFri = [true, true, true, true, true, false, false];
   assert.strictEqual(lib.daysToMask(monFri), 62);
   assert.deepStrictEqual(lib.maskToDays(62), monFri);
-  assert.strictEqual(lib.daysToMask([false, false, false, false, false, false, true]), 1); // So
+  assert.strictEqual(lib.daysToMask([false, false, false, false, false, false, true]), 1); // Sun
 });
 
 test('parseTime', function() {
@@ -47,7 +47,7 @@ test('parseTime', function() {
   assert.deepStrictEqual(lib.parseTime('kaputt'), { hour: 7, minute: 0 });
 });
 
-test('normalizeEvent: abgesagt, ganztägig, Ort, abgelehnt', function() {
+test('normalizeEvent: cancelled, all-day, location, declined', function() {
   assert.strictEqual(lib.normalizeEvent({ isCancelled: true }), null);
   var e = lib.normalizeEvent({
     subject: 'Urlaub', isAllDay: true,
@@ -69,7 +69,7 @@ function ev(start, end, title, extra) {
   return e;
 }
 
-test('selectEvents Cache: Zeitraum heute+morgen, sortiert, Filter', function() {
+test('selectEvents cache: window today+tomorrow, sorted, filters', function() {
   var settings = lib.mergeSettings({});
   var win = lib.queryWindow(new Date(2026, 9, 1, 10, 0), lib.CACHE_DAYS);
   var list = lib.selectEvents([
@@ -79,13 +79,13 @@ test('selectEvents Cache: Zeitraum heute+morgen, sortiert, Filter', function() {
     ev(local(2026, 10, 3, 9), local(2026, 10, 3, 10), 'Übermorgen (raus)'),
     ev(local(2026, 10, 1, 12), local(2026, 10, 1, 13), 'Abgelehnt', { declined: true }),
     ev(local(2026, 10, 1), local(2026, 10, 2), 'Ganztägig', { allDay: true }),
-    ev(local(2026, 10, 1, 14), local(2026, 10, 1, 15), 'B')  // Duplikat aus 2. Kalender
+    ev(local(2026, 10, 1, 14), local(2026, 10, 1, 15), 'B')  // duplicate from 2nd calendar
   ], settings, win);
   assert.deepStrictEqual(list.map(function(e) { return e.title; }),
     ['Ganztägig', 'A (vorbei, bleibt)', 'B', 'Morgen']);
 });
 
-test('selectEvents: Ganztägige ausblenden, Abgelehnte zeigen', function() {
+test('selectEvents: hide all-day, show declined', function() {
   var settings = lib.mergeSettings({ showAllDay: false, hideDeclined: false });
   var list = lib.selectEvents([
     ev(local(2026, 10, 1), local(2026, 10, 2), 'Ganztägig', { allDay: true }),
@@ -94,7 +94,7 @@ test('selectEvents: Ganztägige ausblenden, Abgelehnte zeigen', function() {
   assert.deepStrictEqual(list.map(function(e) { return e.title; }), ['Abgelehnt']);
 });
 
-test('selectEvents einzelner Tag: max. 12, nur dieser Tag', function() {
+test('selectEvents single day: max. 12, only this day', function() {
   var many = [];
   for (var i = 0; i < 20; i++) many.push(ev(local(2026, 10, 5, 8) + i * 60, local(2026, 10, 5, 9) + i * 60, 'T' + i));
   many.push(ev(local(2026, 10, 6, 8), local(2026, 10, 6, 9), 'Nächster Tag'));
@@ -103,7 +103,7 @@ test('selectEvents einzelner Tag: max. 12, nur dieser Tag', function() {
   assert.ok(list.every(function(e) { return e.title !== 'Nächster Tag'; }));
 });
 
-test('selectEvents Cache: heute max. 12, morgen füllt bis 16 auf', function() {
+test('selectEvents cache: today max. 12, tomorrow fills up to 16', function() {
   var many = [];
   for (var i = 0; i < 14; i++) many.push(ev(local(2026, 10, 1, 8) + i * 60, local(2026, 10, 1, 9) + i * 60, 'H' + i));
   for (i = 0; i < 8; i++) many.push(ev(local(2026, 10, 2, 8) + i * 60, local(2026, 10, 2, 9) + i * 60, 'M' + i));
@@ -113,14 +113,14 @@ test('selectEvents Cache: heute max. 12, morgen füllt bis 16 auf', function() {
   assert.strictEqual(list.filter(function(e) { return e.title[0] === 'M'; }).length, 4);
 });
 
-test('queryWindow über Zeitumstellung (25.10.2026)', function() {
+test('queryWindow across DST change (2026-10-25)', function() {
   var w = lib.queryWindow(new Date(2026, 9, 24, 22, 0), 2);
   assert.strictEqual(w.start.getHours(), 0);
   assert.strictEqual(w.end.getHours(), 0);
   assert.strictEqual(w.end.getDate(), 26);
 });
 
-test('normalizeEvent: lange Titel bis 80 Zeichen / 95 Byte', function() {
+test('normalizeEvent: long titles up to 80 chars / 95 bytes', function() {
   var e = lib.normalizeEvent({ subject: 'Ü'.repeat(100), start: { dateTime: '2026-10-01T07:00:00' },
                                end: { dateTime: '2026-10-01T08:00:00' } });
   assert.ok(Buffer.byteLength(e.title, 'utf8') <= 95);
@@ -143,7 +143,7 @@ test('classifyAuthError', function() {
   assert.strictEqual(lib.classifyAuthError(null).code, lib.STATUS.ERROR);
 });
 
-test('Clay-Konfiguration: Defaults und Rückweg', function() {
+test('Clay configuration: defaults and round trip', function() {
   var cals = [{ id: 'a', name: 'Kalender', isDefaultCalendar: true }, { id: 'b', name: 'Familie' }];
   var settings = lib.mergeSettings({});
   var cfg = config.buildConfig(cals, settings, true);
@@ -168,7 +168,7 @@ test('Clay-Konfiguration: Defaults und Rückweg', function() {
   assert.strictEqual(applied.logout, false);
 });
 
-test('Sprache: Auflösung und Übersetzung', function() {
+test('Language: resolution and translation', function() {
   var i18n = require('../src/pkjs/i18n');
   assert.strictEqual(i18n.resolveLang('auto', 'de-AT'), 'de');
   assert.strictEqual(i18n.resolveLang('auto', 'en-US'), 'en');
@@ -183,7 +183,7 @@ test('Sprache: Auflösung und Übersetzung', function() {
   assert.strictEqual(lib.classifyAuthError({ error: 'invalid_grant' }).text, 'Bitte App neu öffnen zum Anmelden.');
 });
 
-test('Clay: Farben und Sprache', function() {
+test('Clay: colors and language', function() {
   var settings = lib.mergeSettings({});
   var cfg = config.buildConfig([], settings, true);
   var colors = cfg.filter(function(s) { return s.items && s.items.some(function(i) { return i.type === 'color'; }); })[0];
@@ -205,13 +205,18 @@ test('Clay: Farben und Sprache', function() {
   assert.strictEqual(settings.grayPast, false);
   assert.strictEqual(config.applyResult({ CFG_GRAY_PAST: { value: true } }, [], settings).settings.grayPast, true);
   assert.strictEqual(config.applyResult({ CFG_TOUCH: { value: false } }, [], settings).settings.touch, false);
+  assert.strictEqual(settings.autoClose, 5);
+  assert.strictEqual(config.applyResult({ CFG_AUTO_CLOSE: { value: '0' } }, [], settings).settings.autoClose, 0);
+  assert.strictEqual(config.applyResult({ CFG_AUTO_CLOSE: { value: '10' } }, [], settings).settings.autoClose, 10);
+  assert.strictEqual(lib.autoCloseMinutes('7'), 5);
+  assert.strictEqual(lib.autoCloseMinutes(undefined), 5);
 });
 
-test('Beschreibung: Kennung und Aufbereitung', function() {
+test('Description: key and cleanup', function() {
   var k = lib.eventKey('AAMkAGI2THVSAAA=');
   assert.strictEqual(k, lib.eventKey('AAMkAGI2THVSAAA='));
   assert.notStrictEqual(k, lib.eventKey('AAMkAGI2THVSAAB='));
-  assert.ok(k !== 0 && (k | 0) === k, 'int32, nie 0');
+  assert.ok(k !== 0 && (k | 0) === k, 'int32, never 0');
   assert.strictEqual(lib.cleanNotes('Agenda:\r\n- Punkt 1\r\n\r\n\r\n- Punkt 2  '), 'Agenda:\n- Punkt 1\n\n- Punkt 2');
   assert.strictEqual(lib.cleanNotes('Bitte Unterlagen mitbringen. ________________________________ Microsoft Teams-Besprechung Jetzt teilnehmen'),
                      'Bitte Unterlagen mitbringen.');
@@ -224,21 +229,21 @@ test('Beschreibung: Kennung und Aufbereitung', function() {
   assert.strictEqual(e.key, lib.eventKey('X1'));
 });
 
-test('Verschieben: Berechtigung, Zeiten, Graph-Body', function() {
+test('Moving: permission, times, Graph body', function() {
   var on = lib.mergeSettings({ moveEnabled: true });
   var solo = { isOrganizer: true, attendees: 0, allDay: false };
   assert.strictEqual(lib.isMovable(solo, on), true);
   assert.strictEqual(lib.isMovable({ isOrganizer: true, attendees: 3 }, on), false);
   assert.strictEqual(lib.isMovable({ isOrganizer: true, attendees: 3 }, lib.mergeSettings({ moveEnabled: true, moveScope: 'own' })), true);
   assert.strictEqual(lib.isMovable({ isOrganizer: false, attendees: 0 }, lib.mergeSettings({ moveEnabled: true, moveScope: 'own' })), false);
-  assert.strictEqual(lib.isMovable(solo, lib.mergeSettings({})), false, 'aus = nie');
+  assert.strictEqual(lib.isMovable(solo, lib.mergeSettings({})), false, 'off = never');
 
-  // Über die Zeitumstellung (Sa 24.10. 09:00 MESZ -> So 25.10.? nein: +1 Woche -> Sa 31.10. 09:00 MEZ)
+  // Across the DST change: +1 week from Sat 24.10. 09:00 CEST -> Sat 31.10. 09:00 CET
   var e = { start: local(2026, 10, 24, 9), end: local(2026, 10, 24, 10), allDay: false };
   var week = lib.shiftEvent(e, 3);
-  assert.strictEqual(week.start, local(2026, 10, 31, 9), 'lokale Uhrzeit bleibt');
+  assert.strictEqual(week.start, local(2026, 10, 31, 9), 'local time of day is kept');
   assert.strictEqual(lib.shiftEvent(e, 0).start, e.start + 3600);
-  // Nächster Montag: Sa 24.10. -> Mo 26.10. (über die Zeitumstellung), Mo 26.10. -> Mo 02.11.
+  // Next Monday: Sat 24.10. -> Mon 26.10. (across the DST change), Mon 26.10. -> Mon 02.11.
   assert.strictEqual(lib.shiftEvent(e, 4).start, local(2026, 10, 26, 9));
   var monday = { start: local(2026, 10, 26, 14), end: local(2026, 10, 26, 15), allDay: false };
   assert.strictEqual(lib.shiftEvent(monday, 4).start, local(2026, 11, 2, 14));
@@ -249,7 +254,7 @@ test('Verschieben: Berechtigung, Zeiten, Graph-Body', function() {
     end: { dateTime: new Date(local(2026, 10, 25, 10) * 1000).toISOString().slice(0, 19), timeZone: 'UTC' }
   });
   var allDay = { start: local(2026, 10, 1), end: local(2026, 10, 2), allDay: true };
-  assert.strictEqual(lib.shiftEvent(allDay, 0), null, 'keine Stunde bei ganztägig');
+  assert.strictEqual(lib.shiftEvent(allDay, 0), null, 'no hour option for all-day');
   assert.deepStrictEqual(lib.graphMoveBody(allDay, 1), {
     start: { dateTime: '2026-10-02T00:00:00', timeZone: 'UTC' },
     end: { dateTime: '2026-10-03T00:00:00', timeZone: 'UTC' }
@@ -260,7 +265,7 @@ test('Verschieben: Berechtigung, Zeiten, Graph-Body', function() {
   var n = lib.normalizeEvent({ id: 'a', isOrganizer: true, attendees: [{}, {}], start: { dateTime: '2026-10-01T07:00:00' },
                                end: { dateTime: '2026-10-01T08:00:00' } });
   assert.strictEqual(n.attendees, 2);
-  // Organisator in der Teilnehmerliste zählt nicht
+  // Organizer in the attendee list does not count
   var me = { emailAddress: { address: 'Me@Example.com' } };
   var self = lib.normalizeEvent({ id: 'b', isOrganizer: true, organizer: me,
     attendees: [{ emailAddress: { address: 'me@example.com' }, status: { response: 'none' } }],
@@ -289,5 +294,5 @@ tests.forEach(function(t) {
     console.log('FAIL ' + t.name + '\n     ' + e.message);
   }
 });
-console.log(failed ? failed + ' Test(s) fehlgeschlagen' : 'Alle ' + tests.length + ' Tests ok');
+console.log(failed ? failed + ' test(s) failed' : 'All ' + tests.length + ' tests ok');
 process.exit(failed ? 1 : 0);

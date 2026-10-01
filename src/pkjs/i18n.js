@@ -1,5 +1,5 @@
-// Übersetzungen (Deutsch/Englisch) für Statusmeldungen und die Einstellungsseite.
-// Die aktuelle Sprache wird aus den Settings gesetzt (setLang), t(key) liefert den Text.
+// Translations (German/English) for status messages and the settings page.
+// The current language is set from the settings (setLang), t(key) returns the text.
 
 var STRINGS = {
   de: {
@@ -16,7 +16,7 @@ var STRINGS = {
     authError: 'Anmeldefehler',
     noCalendarAccess: 'Kein Zugriff auf Kalender.',
     graphError: 'Graph-Fehler',
-    // Einstellungsseite
+    // Settings page
     cfgCalendars: 'Kalender',
     cfgShownCalendars: 'Angezeigte Kalender',
     cfgNoCalendars: 'Noch keine Kalenderliste vorhanden. Bitte zuerst auf der Uhr anmelden – ' +
@@ -37,6 +37,12 @@ var STRINGS = {
     cfgMoveOptions: 'Möglichkeiten',
     moveOptionLabels: ['1 Stunde später', '1 Tag später', '2 Tage später', '1 Woche später', 'Nächster Montag'],
     cfgLanguage: 'Sprache',
+    cfgAutoClose: 'Automatisch schließen',
+    cfgAutoCloseDesc: 'Beendet die App nach dieser Zeit ohne Bedienung und spart Akku (vor allem mit Touch). Nicht während der Anmeldung.',
+    cfgAutoCloseNever: 'Nie',
+    cfgAutoClose2: 'Nach 2 Minuten',
+    cfgAutoClose5: 'Nach 5 Minuten',
+    cfgAutoClose10: 'Nach 10 Minuten',
     cfgTouch: 'Touch-Bedienung',
     cfgTouchDesc: 'Wischen links/rechts wechselt den Tag, hoch/runter scrollt, Tippen öffnet einen Termin. ' +
                   'Ohne Touch: hoch/runter lang drücken wechselt den Tag.',
@@ -92,6 +98,12 @@ var STRINGS = {
     cfgMoveOptions: 'Options',
     moveOptionLabels: ['1 hour later', '1 day later', '2 days later', '1 week later', 'Next Monday'],
     cfgLanguage: 'Language',
+    cfgAutoClose: 'Close automatically',
+    cfgAutoCloseDesc: 'Exits the app after this time without use to save battery (especially with touch). Not during sign-in.',
+    cfgAutoCloseNever: 'Never',
+    cfgAutoClose2: 'After 2 minutes',
+    cfgAutoClose5: 'After 5 minutes',
+    cfgAutoClose10: 'After 10 minutes',
     cfgTouch: 'Touch control',
     cfgTouchDesc: 'Swipe left/right to change the day, up/down to scroll, tap to open an event. ' +
                   'Without touch: long-press up/down to change the day.',
@@ -117,7 +129,7 @@ var STRINGS = {
 
 var current = 'de';
 
-// setting: 'auto' | 'de' | 'en'; phoneLang: z. B. navigator.language
+// setting: 'auto' | 'de' | 'en'; phoneLang: e.g. navigator.language
 function resolveLang(setting, phoneLang) {
   if (setting === 'de' || setting === 'en') return setting;
   return /^de/i.test(phoneLang || '') ? 'de' : 'en';

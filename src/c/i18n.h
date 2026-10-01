@@ -1,7 +1,7 @@
 #pragma once
 #include <pebble.h>
 
-// Sprache der Uhr-Texte (Settings.lang)
+// Language of the watch texts (Settings.lang)
 #define LANG_DE 0
 #define LANG_EN 1
 
@@ -14,7 +14,7 @@ typedef enum {
   STR_LOADING_DAY,
   STR_LOADING_EVENTS,
   STR_OFFLINE,
-  STR_OFFLINE_AS_OF,     // "%s" = Uhrzeit des letzten Syncs
+  STR_OFFLINE_AS_OF,     // "%s" = time of the last sync
   STR_NO_PHONE,
   STR_NO_EVENTS_TODAY,
   STR_NO_EVENTS,
@@ -34,10 +34,10 @@ typedef enum {
   STR_MOVE_OPT_2DAYS,
   STR_MOVE_OPT_WEEK,
   STR_MOVE_OPT_MONDAY,
-  STR_MOVE_CONFIRM,      // "%s" = Ziel
+  STR_MOVE_CONFIRM,      // "%s" = target
   STR_MOVE_CONFIRM_HINT,
   STR_MOVING,
-  STR_MOVED,             // "%s" = Ziel
+  STR_MOVED,             // "%s" = target
   STR_MOVE_FAILED,
   STR_MOVE_NO_SETTINGS,
   STR_MOVE_NOT_ORGANIZER,
@@ -47,9 +47,9 @@ typedef enum {
 } StrId;
 
 const char *tr(StrId id);
-// Kurzer Wochentag, wday wie tm_wday (0 = Sonntag)
+// Short weekday name, wday as in tm_wday (0 = Sunday)
 const char *tr_weekday(int wday);
-// Kurzer Monatsname (0 = Januar), nur Englisch genutzt
+// Short month name (0 = January), used for English only
 const char *tr_month(int mon);
-// Standardsprache aus der Systemsprache der Uhr
+// Default language from the watch's system language
 uint8_t i18n_default_lang(void);

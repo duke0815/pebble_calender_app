@@ -3,7 +3,7 @@
 
 #if defined(PBL_COLOR)
 static bool prv_is_light(GColor c) {
-  // Kanäle 0..3, gewichtete Helligkeit 0..3000
+  // channels 0..3, weighted brightness 0..3000
   return (c.r * 299 + c.g * 587 + c.b * 114) > 1500;
 }
 
