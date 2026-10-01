@@ -13,10 +13,13 @@ var CLIENT_ID = '402716d7-8b06-443b-af50-c37348a787c4';
 // 'common' = alle Kontotypen; für Eigengebrauch kann hier die eigene Tenant-ID stehen.
 var AUTHORITY = 'common';
 
-var SCOPE = 'https://graph.microsoft.com/Calendars.Read offline_access';
+var SCOPE_READ = 'https://graph.microsoft.com/Calendars.Read offline_access';
+// Nur wenn "Termine verschieben" eingeschaltet ist (inkrementelle Zustimmung)
+var SCOPE_RW = 'https://graph.microsoft.com/Calendars.ReadWrite offline_access';
 var LOGIN_BASE = 'https://login.microsoftonline.com/' + AUTHORITY + '/oauth2/v2.0/';
 var GRAPH = 'https://graph.microsoft.com/v1.0';
-var EVENT_FIELDS = 'id,subject,bodyPreview,start,end,isAllDay,location,isCancelled,showAs,responseStatus';
+var EVENT_FIELDS = 'id,subject,bodyPreview,start,end,isAllDay,location,isCancelled,showAs,responseStatus,' +
+                   'isOrganizer,attendees';
 var NOTES_INDEX_MAX = 80;
 var CALENDAR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 var TOKEN_MARGIN_MS = 5 * 60 * 1000;
@@ -109,6 +112,7 @@ function sendSettings(settings) {
     SET_LANG: i18n.getLang() === 'en' ? 1 : 0,
     SET_TOUCH: settings.touch ? 1 : 0,
     SET_GRAY_PAST: settings.grayPast ? 1 : 0,
+    SET_MOVE_OPTS: settings.moveEnabled ? settings.moveOptions : 0,
     SET_COLOR_ACCENT: settings.accentColor,
     SET_COLOR_TEXT: settings.textColor,
     SET_COLOR_BG: settings.bgColor
@@ -123,7 +127,10 @@ function sendSettings(settings) {
 function rememberNotes(events) {
   var index = load('notes', {});
   events.forEach(function(e) {
-    index[e.key] = { id: e.id, notes: e.notes, t: Date.now() };
+    index[e.key] = {
+      id: e.id, notes: e.notes, t: Date.now(),
+      start: e.start, end: e.end, allDay: e.allDay, movable: !!e.movable
+    };
   });
   var keys = Object.keys(index);
   if (keys.length > NOTES_INDEX_MAX) {
@@ -161,6 +168,49 @@ function handleNoteRequest(key) {
   });
 }
 
+// --- Verschieben -------------------------------------------------------------
+
+function sendMoveResult(key, ok, text) {
+  enqueue({ MSG_TYPE: MSG.MOVE_RESULT, EVT_KEY: key, MOVE_OK: ok ? 1 : 0, STATUS_TEXT: text || '' });
+}
+
+function handleMove(key, opt) {
+  var settings = getSettings();
+  var entry = load('notes', {})[key];
+  // Nochmals prüfen – die Uhr könnte veraltete Daten haben
+  if (!entry || !entry.movable || !settings.moveEnabled || !(settings.moveOptions & (1 << opt))) {
+    sendMoveResult(key, false, i18n.t('moveDenied'));
+    return;
+  }
+  var body = lib.graphMoveBody(entry, opt);
+  if (!body) {
+    sendMoveResult(key, false, i18n.t('moveFailed'));
+    return;
+  }
+  getToken(function(err, token) {
+    if (err) {
+      sendMoveResult(key, false, err.text);
+      return;
+    }
+    request('PATCH', GRAPH + '/me/events/' + encodeURIComponent(entry.id), {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+      'Prefer': 'outlook.timezone="UTC"'
+    }, JSON.stringify(body), function(status) {
+      if (status === 200) {
+        sendMoveResult(key, true, '');
+        sync(true);  // Cache (heute + morgen) neu laden
+      } else if (status === 403) {
+        sendMoveResult(key, false, i18n.t('moveDenied'));
+      } else if (status === 0) {
+        sendMoveResult(key, false, i18n.t('noConnection'));
+      } else {
+        sendMoveResult(key, false, i18n.t('moveFailed') + ' (' + status + ')');
+      }
+    });
+  });
+}
+
 function sendEvents(events, listDay, listDays) {
   rememberNotes(events);
   events.forEach(function(e, i) {
@@ -173,7 +223,8 @@ function sendEvents(events, listDay, listDays) {
       EVT_ALLDAY: e.allDay ? 1 : 0,
       EVT_TITLE: e.title,
       EVT_LOCATION: e.location,
-      EVT_KEY: e.key
+      EVT_KEY: e.key,
+      EVT_FLAGS: e.movable ? 1 : 0
     });
   });
   enqueue({ MSG_TYPE: MSG.END, EVT_COUNT: events.length, LIST_DAY: listDay, LIST_DAYS: listDays });
@@ -221,7 +272,9 @@ function storeTokens(json) {
   var auth = {
     access: json.access_token,
     refresh: json.refresh_token || previous.refresh,
-    expires: Date.now() + (json.expires_in || 3600) * 1000
+    expires: Date.now() + (json.expires_in || 3600) * 1000,
+    // Schreibrechte erhalten? (Antwort enthält die gewährten Scopes)
+    rw: json.scope ? /Calendars\.ReadWrite/i.test(json.scope) : !!previous.rw
   };
   save('auth', auth);
   return auth;
@@ -234,6 +287,11 @@ function getToken(callback) {
     return;
   }
   var auth = getAuth();
+  if (auth && getSettings().moveEnabled && !auth.rw) {
+    // Verschieben wurde eingeschaltet -> einmalig neu anmelden, um Schreibrechte zu erhalten
+    clearAuth();
+    auth = null;
+  }
   if (auth && auth.access && auth.expires - Date.now() > TOKEN_MARGIN_MS) {
     callback(null, auth.access);
   } else if (auth && auth.refresh) {
@@ -248,7 +306,7 @@ function refreshToken(refresh, callback) {
     client_id: CLIENT_ID,
     grant_type: 'refresh_token',
     refresh_token: refresh,
-    scope: SCOPE
+    scope: (getAuth() || {}).rw ? SCOPE_RW : SCOPE_READ
   }, function(status, json) {
     if (status === 200 && json && json.access_token) {
       callback(null, storeTokens(json).access);
@@ -284,7 +342,7 @@ function startLogin(callback) {
     return;
   }
   login = { pending: true };
-  postForm(LOGIN_BASE + 'devicecode', { client_id: CLIENT_ID, scope: SCOPE }, function(status, json) {
+  postForm(LOGIN_BASE + 'devicecode', { client_id: CLIENT_ID, scope: getSettings().moveEnabled ? SCOPE_RW : SCOPE_READ }, function(status, json) {
     if (status !== 200 || !json || !json.device_code) {
       finishLogin(status === 0 ? { code: STATUS.NETWORK, text: i18n.t('noConnection') }
                                : lib.classifyAuthError(json));
@@ -499,6 +557,7 @@ function run() {
         done(fetchErr);
         return;
       }
+      events.forEach(function(ev) { ev.movable = lib.isMovable(ev, settings); });
       sendEvents(events, listDay, isCache ? lib.CACHE_DAYS : 1);
       done(null);
       if (isCache && Date.now() - getCalendars().fetched > CALENDAR_MAX_AGE_MS) {
@@ -606,6 +665,8 @@ Pebble.addEventListener('appmessage', function(e) {
     }
   } else if (type === MSG.NOTE_REQUEST) {
     handleNoteRequest(payloadValue(e.payload || {}, 'EVT_KEY'));
+  } else if (type === MSG.MOVE) {
+    handleMove(payloadValue(e.payload || {}, 'EVT_KEY'), payloadValue(e.payload || {}, 'MOVE_OPT'));
   }
 });
 

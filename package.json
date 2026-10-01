@@ -52,7 +52,11 @@
       "EVT_KEY",
       "NOTE_TEXT",
       "SET_TOUCH",
-      "SET_GRAY_PAST"
+      "SET_GRAY_PAST",
+      "EVT_FLAGS",
+      "MOVE_OPT",
+      "MOVE_OK",
+      "SET_MOVE_OPTS"
     ],
     "resources": {
       "media": [

@@ -224,6 +224,41 @@ test('Beschreibung: Kennung und Aufbereitung', function() {
   assert.strictEqual(e.key, lib.eventKey('X1'));
 });
 
+test('Verschieben: Berechtigung, Zeiten, Graph-Body', function() {
+  var on = lib.mergeSettings({ moveEnabled: true });
+  var solo = { isOrganizer: true, attendees: 0, allDay: false };
+  assert.strictEqual(lib.isMovable(solo, on), true);
+  assert.strictEqual(lib.isMovable({ isOrganizer: true, attendees: 3 }, on), false);
+  assert.strictEqual(lib.isMovable({ isOrganizer: true, attendees: 3 }, lib.mergeSettings({ moveEnabled: true, moveScope: 'own' })), true);
+  assert.strictEqual(lib.isMovable({ isOrganizer: false, attendees: 0 }, lib.mergeSettings({ moveEnabled: true, moveScope: 'own' })), false);
+  assert.strictEqual(lib.isMovable(solo, lib.mergeSettings({})), false, 'aus = nie');
+
+  // Über die Zeitumstellung (Sa 24.10. 09:00 MESZ -> So 25.10.? nein: +1 Woche -> Sa 31.10. 09:00 MEZ)
+  var e = { start: local(2026, 10, 24, 9), end: local(2026, 10, 24, 10), allDay: false };
+  var week = lib.shiftEvent(e, 3);
+  assert.strictEqual(week.start, local(2026, 10, 31, 9), 'lokale Uhrzeit bleibt');
+  assert.strictEqual(lib.shiftEvent(e, 0).start, e.start + 3600);
+  assert.deepStrictEqual(lib.graphMoveBody(e, 1), {
+    start: { dateTime: new Date(local(2026, 10, 25, 9) * 1000).toISOString().slice(0, 19), timeZone: 'UTC' },
+    end: { dateTime: new Date(local(2026, 10, 25, 10) * 1000).toISOString().slice(0, 19), timeZone: 'UTC' }
+  });
+  var allDay = { start: local(2026, 10, 1), end: local(2026, 10, 2), allDay: true };
+  assert.strictEqual(lib.shiftEvent(allDay, 0), null, 'keine Stunde bei ganztägig');
+  assert.deepStrictEqual(lib.graphMoveBody(allDay, 1), {
+    start: { dateTime: '2026-10-02T00:00:00', timeZone: 'UTC' },
+    end: { dateTime: '2026-10-03T00:00:00', timeZone: 'UTC' }
+  });
+  var n = lib.normalizeEvent({ id: 'a', isOrganizer: true, attendees: [{}, {}], start: { dateTime: '2026-10-01T07:00:00' },
+                               end: { dateTime: '2026-10-01T08:00:00' } });
+  assert.strictEqual(n.attendees, 2);
+
+  var applied = config.applyResult({ CFG_MOVE: { value: true }, CFG_MOVE_SCOPE: { value: 'own' },
+                                     CFG_MOVE_OPTS: { value: [true, false, false, true] } }, [], lib.mergeSettings({}));
+  assert.strictEqual(applied.settings.moveEnabled, true);
+  assert.strictEqual(applied.settings.moveScope, 'own');
+  assert.strictEqual(applied.settings.moveOptions, 9);
+});
+
 var failed = 0;
 tests.forEach(function(t) {
   try {

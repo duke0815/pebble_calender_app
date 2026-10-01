@@ -9,6 +9,7 @@ typedef struct {
   void (*settings_changed)(void);
   void (*send_failed)(void);
   void (*note)(int32_t key, const char *text);
+  void (*move_result)(int32_t key, bool ok, const char *text);
 } CommHandlers;
 
 void comm_init(CommHandlers handlers);
@@ -19,3 +20,5 @@ void comm_deinit(void);
 bool comm_request(time_t day);
 // Fordert die Beschreibung eines Termins an. false, wenn sofort fehlgeschlagen.
 bool comm_request_note(int32_t key);
+// Termin verschieben (opt = MOVE_OPT_*). false, wenn sofort fehlgeschlagen.
+bool comm_request_move(int32_t key, int opt);

@@ -13,7 +13,7 @@ Details zu Architektur, Protokoll und Entscheidungen: [CLAUDE.md](CLAUDE.md).
    - Für alle (auch outlook.com): **„Konten in einem beliebigen Organisationsverzeichnis und persönliche Microsoft-Konten“**
 4. Umleitungs-URI: leer lassen → **Registrieren**
 5. **Authentifizierung → Erweiterte Einstellungen → „Öffentliche Clientflows zulassen“ = Ja** → Speichern
-6. **API-Berechtigungen → Berechtigung hinzufügen → Microsoft Graph → Delegierte Berechtigungen → `Calendars.Read`** (`offline_access` ist automatisch dabei). Bist du Admin im eigenen Tenant, gleich **„Administratorzustimmung erteilen“** klicken.
+6. **API-Berechtigungen → Berechtigung hinzufügen → Microsoft Graph → Delegierte Berechtigungen → `Calendars.Read`** (`offline_access` ist automatisch dabei). Für „Termine verschieben“ zusätzlich **`Calendars.ReadWrite`** hinzufügen (wird nur angefragt, wenn die Funktion eingeschaltet ist). Bist du Admin im eigenen Tenant, gleich **„Administratorzustimmung erteilen“** klicken.
 7. **Übersicht → „Anwendungs-ID (Client)“** kopieren und in [`src/pkjs/index.js`](src/pkjs/index.js) eintragen:
    ```js
    var CLIENT_ID = 'deine-client-id';
@@ -56,6 +56,7 @@ Einstellungen (Kalender, Sprache Deutsch/Englisch, Farben, Briefing) findest du 
 - **Tasten:** hoch/runter = Termin auswählen (der erste Druck zeigt nur die Auswahl), **lang drücken = vorheriger/nächster Tag**, Select = Details.
 - **Wischen (Pebble Time 2, abschaltbar in den Einstellungen):** links = nächster Tag, rechts = vorheriger Tag, hoch/runter = flüssig scrollen. Heute und morgen sind sofort da (auch offline), andere Tage werden vom Handy geladen. Für das flüssige Scrollen und Tippen muss auf der Uhr die **Touch-Navigation** eingeschaltet sein (Einstellungen der Uhr).
 - **Termin öffnen:** antippen oder Select. Die Detailansicht zeigt auch die Beschreibung aus Outlook – sie wird beim Öffnen vom Handy geladen; ist das Handy nicht in Reichweite, steht dort ein Hinweis. Wischen hoch/runter scrollt, nach rechts wischen geht zurück.
+- **Termin verschieben (optional):** in den Einstellungen „Verschieben erlauben“ einschalten (die Uhr zeigt dann einmalig einen neuen Anmelde-Code). In der Detailansicht eines eigenen Termins Select drücken → Option wählen (z. B. „1 Tag später – Fr 02.10. 09:00“) → bestätigen. Welche Optionen es gibt und ob auch Termine mit Teilnehmern verschoben werden dürfen, stellst du in den Einstellungen ein.
 - **Aktualisieren:** automatisch einmal beim Öffnen der App.
 - **Konto wechseln:** in den Einstellungen „Abmelden“, dann die App neu öffnen.
 - **Briefing:** Zur eingestellten Zeit startet die App, vibriert, lädt frische Daten (sonst Cache) und schließt sich nach 60 s ohne Bedienung wieder.

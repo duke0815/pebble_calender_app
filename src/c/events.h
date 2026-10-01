@@ -7,6 +7,7 @@ typedef struct {
   int32_t end;            // Epoch-Sekunden (ganztaegig: exklusive lokale Mitternacht)
   int32_t key;            // Kennung für die Beschreibung (0 = keine)
   uint8_t all_day;
+  uint8_t flags;          // EVT_FLAG_*
   char title[TITLE_LEN];
   char location[LOCATION_LEN];
 } CalEvent;
@@ -26,6 +27,8 @@ bool events_commit(int count, time_t list_day, int list_days);
 // Ansicht: genau ein Tag
 void events_set_view_day(time_t day);
 time_t events_view_day(void);
+// Tagespuffer verwerfen (z. B. nach dem Verschieben eines Termins)
+void events_invalidate_day(void);
 // true, wenn für den angezeigten Tag Daten vorliegen (Cache oder Tagespuffer)
 bool events_view_available(void);
 void events_rebuild_view(void);

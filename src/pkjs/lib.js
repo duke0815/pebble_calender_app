@@ -10,9 +10,19 @@ var MSG = {
   LOGIN_CODE: 4,
   SETTINGS: 5,
   NOTE: 6,
+  MOVE_RESULT: 7,
   REQUEST: 10,
-  NOTE_REQUEST: 12
+  NOTE_REQUEST: 12,
+  MOVE: 13
 };
+
+// Verschiebe-Optionen: Index = MOVE_OPT im Protokoll = Bit in settings.moveOptions
+var MOVE_OPTIONS = [
+  { hours: 1 },   // 0: 1 Stunde später
+  { days: 1 },    // 1: 1 Tag später
+  { days: 2 },    // 2: 2 Tage später
+  { days: 7 }     // 3: 1 Woche später
+];
 
 var STATUS = {
   SYNCING: 1,
@@ -45,6 +55,9 @@ var DEFAULT_SETTINGS = {
   language: 'auto',           // 'auto' | 'de' | 'en'
   touch: true,                // Touch-Bedienung auf der Uhr (Pebble Time 2)
   grayPast: false,            // vergangene Termine grau anzeigen
+  moveEnabled: false,         // Termine verschieben (braucht Calendars.ReadWrite)
+  moveScope: 'solo',          // 'solo' = eigene Termine ohne Teilnehmer, 'own' = alle eigenen
+  moveOptions: 10,            // Bitmaske über MOVE_OPTIONS; Default: 1 Tag + 1 Woche
   accentColor: 0x0055AA,      // 0xRRGGBB (Pebble-Palette)
   textColor: 0x000000,
   bgColor: 0xFFFFFF
@@ -227,8 +240,62 @@ function normalizeEvent(e) {
     notes: e.hasOwnProperty('bodyPreview') ? cleanNotes(e.bodyPreview) : null,
     title: truncate(e.subject || '', TITLE_CHARS, TITLE_BYTES),
     location: truncate((e.location && e.location.displayName) || '', LOCATION_CHARS, LOCATION_BYTES),
-    declined: !!(e.responseStatus && e.responseStatus.response === 'declined')
+    declined: !!(e.responseStatus && e.responseStatus.response === 'declined'),
+    isOrganizer: !!e.isOrganizer,
+    attendees: (e.attendees || []).length
   };
+}
+
+// ---------------------------------------------------------------------------
+// Verschieben
+
+// Nur eigene Termine (Organisator); je nach Einstellung nur ohne Teilnehmer.
+// Einladungen anderer sind nie verschiebbar.
+function isMovable(e, settings) {
+  if (!e || !settings.moveEnabled || !e.isOrganizer) return false;
+  return settings.moveScope === 'own' || !e.attendees;
+}
+
+function pad2(n) {
+  return (n < 10 ? '0' : '') + n;
+}
+
+// Neue Zeiten (Epoch-Sekunden) für Option opt; Tage behalten die lokale Uhrzeit
+// (auch über die Zeitumstellung). null, wenn die Option nicht passt (Stunde bei ganztägig).
+function shiftEvent(e, opt) {
+  var o = MOVE_OPTIONS[opt];
+  if (!o) return null;
+  if (o.hours) {
+    if (e.allDay) return null;
+    return { start: e.start + o.hours * 3600, end: e.end + o.hours * 3600 };
+  }
+  function addDays(sec) {
+    var d = new Date(sec * 1000);
+    d.setDate(d.getDate() + o.days);
+    return Math.floor(d.getTime() / 1000);
+  }
+  return { start: addDays(e.start), end: addDays(e.end) };
+}
+
+function utcDateTime(sec) {
+  return new Date(sec * 1000).toISOString().slice(0, 19);
+}
+
+function localDate(sec) {
+  var d = new Date(sec * 1000);
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T00:00:00';
+}
+
+// Body für PATCH /me/events/{id}
+function graphMoveBody(e, opt) {
+  var t = shiftEvent(e, opt);
+  if (!t) return null;
+  if (e.allDay) {
+    return { start: { dateTime: localDate(t.start), timeZone: 'UTC' },
+             end: { dateTime: localDate(t.end), timeZone: 'UTC' } };
+  }
+  return { start: { dateTime: utcDateTime(t.start), timeZone: 'UTC' },
+           end: { dateTime: utcDateTime(t.end), timeZone: 'UTC' } };
 }
 
 // Filtert, sortiert und kuerzt die normalisierten Termine fuer die Uhr.
@@ -339,6 +406,10 @@ module.exports = {
   daysToMask: daysToMask,
   maskToDays: maskToDays,
   normalizeEvent: normalizeEvent,
+  MOVE_OPTIONS: MOVE_OPTIONS,
+  isMovable: isMovable,
+  shiftEvent: shiftEvent,
+  graphMoveBody: graphMoveBody,
   eventKey: eventKey,
   cleanNotes: cleanNotes,
   selectEvents: selectEvents,

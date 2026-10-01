@@ -3,6 +3,7 @@
 #include "format.h"
 #include "i18n.h"
 #include "theme.h"
+#include "ui_move.h"
 
 #if defined(PBL_PLATFORM_EMERY)
   #define FONT_SMALL FONT_KEY_GOTHIC_18
@@ -20,7 +21,7 @@
 #define NOTE_SEND_RETRY_MS 250
 #define NOTE_SEND_TRIES 8
 
-enum { L_DATE, L_TIME, L_TITLE, L_LOCATION, L_NOTES, L_COUNT };
+enum { L_DATE, L_TIME, L_TITLE, L_LOCATION, L_MOVE_HINT, L_NOTES, L_COUNT };
 
 static Window *s_window;
 static ScrollLayer *s_scroll;
@@ -111,12 +112,24 @@ static void prv_note_request(void) {
   prv_note_send(NULL);
 }
 
+// Select öffnet das Verschieben (wenn erlaubt); hoch/runter scrollt weiterhin
+static void prv_select_click(ClickRecognizerRef recognizer, void *context) {
+  if (ui_move_available(&s_event)) {
+    ui_move_show(&s_event);
+  }
+}
+
+static void prv_click_config(void *context) {
+  window_single_click_subscribe(BUTTON_ID_SELECT, prv_select_click);
+}
+
 static void prv_window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(root);
   s_width = bounds.size.w;
 
   s_scroll = scroll_layer_create(bounds);
+  scroll_layer_set_callbacks(s_scroll, (ScrollLayerCallbacks) { .click_config_provider = prv_click_config });
   scroll_layer_set_click_config_onto_window(s_scroll, window);
   scroll_layer_set_shadow_hidden(s_scroll, true);
   layer_add_child(root, scroll_layer_get_layer(s_scroll));
@@ -141,6 +154,10 @@ static void prv_window_load(Window *window) {
   y = prv_add_text(L_TITLE, s_event.title[0] ? s_event.title : tr(STR_NO_TITLE), FONT_TITLE, y);
   if (s_event.location[0]) {
     y = prv_add_text(L_LOCATION, s_event.location, FONT_SMALL, y);
+  }
+  if (ui_move_available(&s_event)) {
+    y = prv_add_text(L_MOVE_HINT, tr(STR_MOVE_HINT), FONT_SMALL, y + 2);
+    text_layer_set_text_color(s_layers[L_MOVE_HINT], PBL_IF_COLOR_ELSE(theme_accent(), theme_text()));
   }
   scroll_layer_set_content_size(s_scroll, GSize(s_width, y + PAD));
 

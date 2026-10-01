@@ -39,6 +39,7 @@ static void prv_handle_event(DictionaryIterator *iter) {
   event.end = prv_int(iter, MESSAGE_KEY_EVT_END, 0);
   event.all_day = prv_int(iter, MESSAGE_KEY_EVT_ALLDAY, 0) ? 1 : 0;
   event.key = prv_int(iter, MESSAGE_KEY_EVT_KEY, 0);
+  event.flags = prv_int(iter, MESSAGE_KEY_EVT_FLAGS, 0);
   prv_str(iter, MESSAGE_KEY_EVT_TITLE, event.title, sizeof(event.title));
   prv_str(iter, MESSAGE_KEY_EVT_LOCATION, event.location, sizeof(event.location));
   events_receive(index, &event);
@@ -53,6 +54,7 @@ static void prv_handle_settings(DictionaryIterator *iter) {
   s->lang = prv_int(iter, MESSAGE_KEY_SET_LANG, s->lang) == LANG_EN ? LANG_EN : LANG_DE;
   s->touch_off = prv_int(iter, MESSAGE_KEY_SET_TOUCH, !s->touch_off) ? 0 : 1;
   s->gray_past = prv_int(iter, MESSAGE_KEY_SET_GRAY_PAST, s->gray_past) ? 1 : 0;
+  s->move_opts = prv_int(iter, MESSAGE_KEY_SET_MOVE_OPTS, s->move_opts) & ((1 << MOVE_OPT_COUNT) - 1);
   s->color_accent = (uint32_t)prv_int(iter, MESSAGE_KEY_SET_COLOR_ACCENT, s->color_accent) & 0xFFFFFF;
   s->color_text = (uint32_t)prv_int(iter, MESSAGE_KEY_SET_COLOR_TEXT, s->color_text) & 0xFFFFFF;
   s->color_bg = (uint32_t)prv_int(iter, MESSAGE_KEY_SET_COLOR_BG, s->color_bg) & 0xFFFFFF;
@@ -93,6 +95,15 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
       if (s_handlers.note) s_handlers.note(prv_int(iter, MESSAGE_KEY_EVT_KEY, 0), note);
       break;
     }
+    case MSG_MOVE_RESULT: {
+      static char text[STATUS_LEN];
+      prv_str(iter, MESSAGE_KEY_STATUS_TEXT, text, sizeof(text));
+      if (s_handlers.move_result) {
+        s_handlers.move_result(prv_int(iter, MESSAGE_KEY_EVT_KEY, 0),
+                               prv_int(iter, MESSAGE_KEY_MOVE_OK, 0) != 0, text);
+      }
+      break;
+    }
     case MSG_SETTINGS:
       prv_handle_settings(iter);
       if (s_handlers.settings_changed) s_handlers.settings_changed();
@@ -130,6 +141,17 @@ bool comm_request_note(int32_t key) {
   }
   dict_write_int32(iter, MESSAGE_KEY_MSG_TYPE, MSG_NOTE_REQUEST);
   dict_write_int32(iter, MESSAGE_KEY_EVT_KEY, key);
+  return app_message_outbox_send() == APP_MSG_OK;
+}
+
+bool comm_request_move(int32_t key, int opt) {
+  DictionaryIterator *iter;
+  if (app_message_outbox_begin(&iter) != APP_MSG_OK) {
+    return false;
+  }
+  dict_write_int32(iter, MESSAGE_KEY_MSG_TYPE, MSG_MOVE);
+  dict_write_int32(iter, MESSAGE_KEY_EVT_KEY, key);
+  dict_write_int32(iter, MESSAGE_KEY_MOVE_OPT, opt);
   return app_message_outbox_send() == APP_MSG_OK;
 }
 

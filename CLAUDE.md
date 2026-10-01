@@ -27,6 +27,7 @@ src/c/settings.c/.h  Uhr-Settings (Briefing) + Wakeup-Planung
 src/c/ui_main.c/.h   Hauptfenster: Statuszeile + MenuLayer
 src/c/ui_detail.c/.h Detailansicht eines Termins
 src/c/ui_login.c/.h  Anzeige des Device-Codes
+src/c/ui_move.c/.h   Termin verschieben: Optionen mit Zieldatum, Bestätigung, Ergebnis
 src/c/protocol.h     Gemeinsame Konstanten (MSG_TYPE, STATUS_CODE, Längen)
 src/pkjs/index.js    PebbleKit JS: Ablaufsteuerung, Auth, Graph, Senden an Uhr
 src/pkjs/lib.js      Reine Logik (Zeiten, Filter, Kürzen, Fehlerklassifizierung) – mit Node testbar
@@ -50,7 +51,7 @@ Zeitberechnung auf der Uhr nur über `time_make_local()` / `time_day_start()` (k
   - `POST https://login.microsoftonline.com/{AUTHORITY}/oauth2/v2.0/devicecode`
   - `POST https://login.microsoftonline.com/{AUTHORITY}/oauth2/v2.0/token` (Polling im angegebenen Intervall, `slow_down` → +5 s)
   - `AUTHORITY` als Konstante: Standard `common`; für Eigengebrauch kann die eigene Tenant-ID eingetragen werden.
-- Scopes: `https://graph.microsoft.com/Calendars.Read offline_access`
+- Scopes: `https://graph.microsoft.com/Calendars.Read offline_access`; **nur wenn „Termine verschieben“ eingeschaltet ist** `Calendars.ReadWrite offline_access` (inkrementelle Zustimmung). `auth.rw` merkt sich, ob die Token-Antwort `Calendars.ReadWrite` enthielt; fehlt es bei eingeschaltetem Verschieben, werden die Tokens verworfen und der Login startet neu (Code auf der Uhr). Refresh fordert den Scope an, den das Token hat.
 - Anzeige des Codes **auf der Uhr**: „microsoft.com/devicelogin – Code: XXXXXX“. Login startet automatisch beim App-Start, wenn kein Token vorhanden ist. Es gibt **keinen Menüpunkt** dafür; Kontowechsel = in den Einstellungen „Abmelden“, dann App neu öffnen. Während des Logins muss die App offen bleiben (PebbleKit JS läuft nur, solange die Watchapp läuft).
 - Access Token + Refresh Token + Ablaufzeit in `localStorage` (PebbleKit JS). Erneuern, wenn weniger als 5 Minuten Restlaufzeit.
 - `invalid_grant` / `interaction_required` → Tokens löschen, Uhr zeigt „Bitte App neu öffnen zum Anmelden.“ (beim nächsten Start startet der Login automatisch).
@@ -90,6 +91,9 @@ Clay-Config wird beim Öffnen (`showConfiguration`) **dynamisch** aus der gecach
 | Tägliches Briefing | Toggle (Default aus) |
 | Briefing-Uhrzeit | Zeit (Default 07:00) |
 | Briefing-Wochentage | Checkbox-Gruppe (Default Mo–Fr) |
+| Verschieben erlauben | Toggle (Default **aus**); an → Schreibrechte, einmalige Neuanmeldung |
+| Verschieben: Erlaubt für | Auswahl: `solo` = eigene Termine ohne Teilnehmer (Default) / `own` = alle eigenen (Teilnehmer bekommen ein Update) |
+| Verschieben: Möglichkeiten | Checkbox-Gruppe: 1 Stunde / 1 Tag / 2 Tage / 1 Woche später (Default 1 Tag + 1 Woche, Bitmaske `moveOptions`) |
 | Abmelden | Toggle → Tokens löschen |
 
 Clay füllt `meta.activeWatchInfo` nur beim `ready`-Event – bei der pro Öffnen neu erzeugten Instanz setzt `index.js` das selbst (sonst zeigt der Farbwähler nur Schwarz/Weiß). Keine `capabilities` in der Config verwenden (Clay kennt neuere Plattformen nicht).
@@ -101,13 +105,17 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 
 | Key | Typ | Inhalt |
 |---|---|---|
-| `MSG_TYPE` | int | Handy→Uhr: 1 = Termin, 2 = Ende der Liste, 3 = Status/Fehler, 4 = Login-Code, 5 = Settings, 6 = Beschreibung. Uhr→Handy: 10 = REQUEST (Daten anfordern), 12 = Beschreibung anfordern |
+| `MSG_TYPE` | int | Handy→Uhr: 1 = Termin, 2 = Ende der Liste, 3 = Status/Fehler, 4 = Login-Code, 5 = Settings, 6 = Beschreibung, 7 = Ergebnis Verschieben. Uhr→Handy: 10 = REQUEST (Daten anfordern), 12 = Beschreibung anfordern, 13 = Verschieben |
 | `EVT_INDEX` / `EVT_COUNT` | int | Position / Gesamtzahl (`EVT_COUNT` auch bei MSG_TYPE 2) |
 | `EVT_START` / `EVT_END` | int32 | Epoch-Sekunden (ganztägig: lokale Mitternacht, s. o.) |
 | `EVT_ALLDAY` | int | 0/1 |
 | `EVT_TITLE` | cstring | max. 80 Zeichen **und** max. 95 Byte UTF-8, in JS gekürzt (`...`) |
 | `EVT_LOCATION` | cstring | max. 40 Zeichen **und** max. 47 Byte UTF-8 |
 | `EVT_KEY` | int32 | Kennung des Termins (bei MSG_TYPE 1, 6, 12) |
+| `EVT_FLAGS` | int | bei MSG_TYPE 1: Bit 0 = verschiebbar (JS: `lib.isMovable`) |
+| `MOVE_OPT` | int | bei MSG_TYPE 13: 0 = +1 Stunde, 1 = +1 Tag, 2 = +2 Tage, 3 = +1 Woche |
+| `MOVE_OK` | int | bei MSG_TYPE 7: 1 = verschoben, 0 = Fehler (Text in `STATUS_TEXT`) |
+| `SET_MOVE_OPTS` | int | Bitmaske der erlaubten Optionen, 0 = Verschieben aus |
 | `NOTE_TEXT` | cstring | bei MSG_TYPE 6: aufbereitete Beschreibung (max. 400 Byte), leer = keine |
 | `LIST_DAY` / `LIST_DAYS` | int | bei MSG_TYPE 2: lokale Mitternacht (Epoch) des ersten Tages / Anzahl Tage (2 = Cache, 1 = einzelner Tag) |
 | `REQ_DAY` | int | bei MSG_TYPE 10: 0 = Cache neu laden, sonst lokale Mitternacht des gewünschten Tages (JS schickt sie als `LIST_DAY` unverändert zurück) |
@@ -153,6 +161,12 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 - Leerer Zustand: „Keine Termine heute“ bzw. „Keine Termine“; bei Fehlern der Fehlertext; ohne Daten/Verbindung „Keine Verbindung zum Handy.“
 - Timeout für eine Synchronisierung: 30 s (außer während des Logins), dann „Offline“.
 
+## Termine verschieben (opt-in)
+- Nur wenn in den Einstellungen eingeschaltet. Verschiebbar (`lib.isMovable`): `isOrganizer` und – bei „Erlaubt für“ = `solo` – keine Teilnehmer (Räume zählen als Teilnehmer). Einladungen anderer nie.
+- Uhr: Detailansicht zeigt „Select: Verschieben“ (Akzentfarbe); Select → `ui_move`: Liste der freigegebenen Optionen mit Zieldatum/-zeit (+1 Stunde nicht bei ganztägig) → Bestätigung „Verschieben auf …?“ (Select = Ja, Zurück = Nein) → „Verschiebe...“ (Timeout 12 s, Sende-Retry) → „Verschoben auf …“ + Vibration, nach 1,5 s zurück zur Tagesansicht; Fehler bleiben stehen (Doppelvibration).
+- Handy: prüft Berechtigung erneut (Index `notes` speichert id/start/end/allDay/movable), dann `PATCH /me/events/{id}` mit neuem start/end (UTC; Tage behalten die lokale Uhrzeit, auch über DST; ganztägig: Datum + `T00:00:00`, `timeZone: UTC`). Danach `sync(true)`; die Uhr verwirft den Tagespuffer und lädt den angezeigten Tag neu.
+- Serientermine: verschoben wird nur das eine Vorkommen (Graph legt eine Ausnahme an).
+
 ## Tägliches Briefing (Wakeup-API)
 - `wakeup_schedule()` immer nur für den **nächsten** Briefing-Zeitpunkt (berücksichtigt Wochentage); vorher `wakeup_cancel_all()`.
 - Neu planen: bei jedem App-Start, nach jeder Settings-Änderung und bei jedem Wakeup.
@@ -180,7 +194,7 @@ Positionierung bei Veröffentlichung: primär Privatkonten und kleine Firmen, ni
 
 ## Nicht-Ziele
 - Kein eigener Server/Proxy, keine Timeline-Pins.
-- Keine Schreibzugriffe auf den Kalender.
+- Keine Schreibzugriffe auf den Kalender – **einzige Ausnahme:** „Termine verschieben“ (opt-in, nur eigene Termine, s. „Termine verschieben“). Kein Anlegen, Löschen, Annehmen/Ablehnen.
 - Keine anderen Kalenderquellen (Google, CalDAV) in Version 1. Graph-spezifischer Code bleibt in `index.js`/`lib.js` gekapselt, damit später weitere Quellen andocken können.
 
 ## Reihenfolge der Umsetzung

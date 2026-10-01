@@ -9,9 +9,21 @@
 #define MSG_LOGIN_CODE   4
 #define MSG_SETTINGS     5
 #define MSG_NOTE         6
+#define MSG_MOVE_RESULT  7
 // MSG_TYPE: Uhr -> Handy
 #define MSG_REQUEST      10
 #define MSG_NOTE_REQUEST 12
+#define MSG_MOVE         13
+
+// EVT_FLAGS
+#define EVT_FLAG_MOVABLE 1
+
+// Verschiebe-Optionen (MOVE_OPT, Bits in SET_MOVE_OPTS) – wie MOVE_OPTIONS in lib.js
+#define MOVE_OPT_HOUR  0
+#define MOVE_OPT_DAY   1
+#define MOVE_OPT_2DAYS 2
+#define MOVE_OPT_WEEK  3
+#define MOVE_OPT_COUNT 4
 
 // STATUS_CODE
 #define STATUS_SYNCING        1

@@ -107,6 +107,36 @@ function buildConfig(calendars, settings, loggedIn) {
     {
       type: 'section',
       items: [
+        { type: 'heading', defaultValue: t('cfgMove') },
+        {
+          type: 'toggle',
+          messageKey: 'CFG_MOVE',
+          label: t('cfgMoveEnable'),
+          description: t('cfgMoveEnableDesc'),
+          defaultValue: settings.moveEnabled
+        },
+        {
+          type: 'select',
+          messageKey: 'CFG_MOVE_SCOPE',
+          label: t('cfgMoveScope'),
+          defaultValue: settings.moveScope,
+          options: [
+            { label: t('cfgMoveSolo'), value: 'solo' },
+            { label: t('cfgMoveOwn'), value: 'own' }
+          ]
+        },
+        {
+          type: 'checkboxgroup',
+          messageKey: 'CFG_MOVE_OPTS',
+          label: t('cfgMoveOptions'),
+          options: t('moveOptionLabels'),
+          defaultValue: t('moveOptionLabels').map(function(l, i) { return !!(settings.moveOptions & (1 << i)); })
+        }
+      ]
+    },
+    {
+      type: 'section',
+      items: [
         { type: 'heading', defaultValue: t('cfgBriefing') },
         {
           type: 'toggle',
@@ -178,6 +208,13 @@ function applyResult(result, calendars, settings) {
   next.showAllDay = !!value(result, 'CFG_ALLDAY', next.showAllDay);
   next.touch = !!value(result, 'CFG_TOUCH', next.touch);
   next.grayPast = !!value(result, 'CFG_GRAY_PAST', next.grayPast);
+  next.moveEnabled = !!value(result, 'CFG_MOVE', next.moveEnabled);
+  next.moveScope = value(result, 'CFG_MOVE_SCOPE', next.moveScope) === 'own' ? 'own' : 'solo';
+  var moveOpts = value(result, 'CFG_MOVE_OPTS', null);
+  if (moveOpts && moveOpts.length) {
+    next.moveOptions = 0;
+    moveOpts.forEach(function(on, i) { if (on) next.moveOptions |= 1 << i; });
+  }
   next.hideDeclined = !!value(result, 'CFG_HIDE_DECLINED', next.hideDeclined);
   next.briefEnabled = !!value(result, 'CFG_BRIEF', next.briefEnabled);
   var t = lib.parseTime(value(result, 'CFG_BRIEF_TIME', next.briefTime));

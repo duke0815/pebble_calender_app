@@ -110,6 +110,9 @@ void scroll_layer_add_child(ScrollLayer *scroll_layer, Layer *child);
 void scroll_layer_set_click_config_onto_window(ScrollLayer *scroll_layer, Window *window);
 void scroll_layer_set_content_size(ScrollLayer *scroll_layer, GSize size);
 void scroll_layer_set_shadow_hidden(ScrollLayer *scroll_layer, bool hidden);
+typedef void (*ScrollLayerCallback)(ScrollLayer *scroll_layer, void *context);
+typedef struct ScrollLayerCallbacks { ClickConfigProvider click_config_provider; ScrollLayerCallback content_offset_changed_handler; } ScrollLayerCallbacks;
+void scroll_layer_set_callbacks(ScrollLayer *scroll_layer, ScrollLayerCallbacks callbacks);
 void scroll_layer_set_content_offset(ScrollLayer *scroll_layer, GPoint offset, bool animated);
 GPoint scroll_layer_get_content_offset(ScrollLayer *scroll_layer);
 
@@ -146,6 +149,8 @@ void menu_layer_set_selected_next(MenuLayer *menu_layer, bool up, MenuRowAlign s
 void menu_layer_set_normal_colors(MenuLayer *menu_layer, GColor background, GColor foreground);
 void menu_layer_set_highlight_colors(MenuLayer *menu_layer, GColor background, GColor foreground);
 bool menu_cell_layer_is_highlighted(const Layer *cell_layer);
+#define MENU_CELL_BASIC_HEADER_HEIGHT ((const int16_t) 16)
+void menu_cell_basic_header_draw(GContext *ctx, const Layer *cell_layer, const char *title);
 void menu_cell_basic_draw(GContext *ctx, const Layer *cell_layer, const char *title, const char *subtitle, GBitmap *icon);
 
 void graphics_context_set_fill_color(GContext *ctx, GColor color);
@@ -184,7 +189,8 @@ extern uint32_t MESSAGE_KEY_MSG_TYPE, MESSAGE_KEY_EVT_INDEX, MESSAGE_KEY_EVT_COU
   MESSAGE_KEY_SET_BRIEF_ENABLED, MESSAGE_KEY_SET_BRIEF_HOUR, MESSAGE_KEY_SET_BRIEF_MINUTE,
   MESSAGE_KEY_SET_BRIEF_DAYS, MESSAGE_KEY_REQ_DAY, MESSAGE_KEY_LIST_DAY, MESSAGE_KEY_LIST_DAYS,
   MESSAGE_KEY_SET_LANG, MESSAGE_KEY_SET_COLOR_ACCENT, MESSAGE_KEY_SET_COLOR_TEXT, MESSAGE_KEY_SET_COLOR_BG,
-  MESSAGE_KEY_EVT_KEY, MESSAGE_KEY_NOTE_TEXT, MESSAGE_KEY_SET_TOUCH, MESSAGE_KEY_SET_GRAY_PAST;
+  MESSAGE_KEY_EVT_KEY, MESSAGE_KEY_NOTE_TEXT, MESSAGE_KEY_SET_TOUCH, MESSAGE_KEY_SET_GRAY_PAST,
+  MESSAGE_KEY_EVT_FLAGS, MESSAGE_KEY_MOVE_OPT, MESSAGE_KEY_MOVE_OK, MESSAGE_KEY_SET_MOVE_OPTS;
 
 typedef int32_t status_t;
 typedef enum { S_SUCCESS = 0, E_ERROR = -1, E_RANGE = -8 } StatusCode;
@@ -214,6 +220,7 @@ void tick_timer_service_subscribe(TimeUnits tick_units, TickHandler handler);
 void tick_timer_service_unsubscribe(void);
 
 void vibes_short_pulse(void);
+void vibes_double_pulse(void);
 
 /* Touch (PebbleOS: fw/applib/touch_service.h, pbl/services/touch/touch_event.h) */
 #ifdef PBL_TOUCH

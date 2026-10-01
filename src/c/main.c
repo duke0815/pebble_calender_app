@@ -7,6 +7,7 @@
 #include "ui_main.h"
 #include "ui_login.h"
 #include "ui_detail.h"
+#include "ui_move.h"
 #include "i18n.h"
 
 #define SYNC_TIMEOUT_MS        30000
@@ -275,6 +276,18 @@ static void prv_settings_changed(void) {
   ui_main_reload(true);
 }
 
+static void prv_change_day(int delta);
+
+// Verschieben-Ergebnis: Anzeige im Verschiebe-Fenster; bei Erfolg Tag neu laden
+// (den Cache lädt das Handy nach dem Verschieben ohnehin neu).
+static void prv_move_result(int32_t key, bool ok, const char *text) {
+  ui_move_result(key, ok, text);
+  if (ok) {
+    events_invalidate_day();
+    prv_change_day(0);
+  }
+}
+
 static void prv_note(int32_t key, const char *text) {
   ui_detail_set_note(key, text);
 }
@@ -430,6 +443,7 @@ static void prv_init(void) {
     .settings_changed = prv_settings_changed,
     .send_failed = prv_send_failed,
     .note = prv_note,
+    .move_result = prv_move_result,
   });
 
   ui_main_push((UiMainCallbacks) {

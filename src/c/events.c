@@ -1,6 +1,6 @@
 #include "events.h"
 
-#define CACHE_VERSION 3
+#define CACHE_VERSION 4
 
 #define PERSIST_KEY_VERSION    1
 #define PERSIST_KEY_COUNT      2
@@ -149,6 +149,11 @@ static bool prv_cache_covers(time_t day) {
 void events_set_view_day(time_t day) {
   s_view_day = time_day_start(day);
   events_rebuild_view();
+}
+
+void events_invalidate_day(void) {
+  s_day_key = 0;
+  s_day_count = 0;
 }
 
 time_t events_view_day(void) {

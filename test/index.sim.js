@@ -33,9 +33,16 @@ function fire(name, e) { (listeners[name] || []).forEach(function(fn) { fn(e || 
 
 var tokenPolls = 0;
 var requests = [];
+var lastScope = '';
+var patches = [];
 function respond(method, url, body) {
   requests.push(method + ' ' + url.split('?')[0]);
+  if (method === 'PATCH') {
+    patches.push({ url: url, body: JSON.parse(body) });
+    return [200, { id: 'evt-standup' }];
+  }
   if (/devicecode$/.test(url)) {
+    lastScope = decodeURIComponent(/scope=([^&]*)/.exec(body)[1]);
     return [200, { device_code: 'DEV', user_code: 'ABCD-1234', verification_uri: 'https://microsoft.com/devicelogin',
                    interval: 0.01, expires_in: 900 }];
   }
@@ -43,13 +50,14 @@ function respond(method, url, body) {
     if (/device_code/.test(body)) {
       tokenPolls++;
       if (tokenPolls < 3) return [400, { error: 'authorization_pending' }];
-      return [200, { access_token: 'AT', refresh_token: 'RT', expires_in: 3600 }];
+      return [200, { access_token: 'AT', refresh_token: 'RT', expires_in: 3600, scope: lastScope }];
     }
     return [200, { access_token: 'AT2', expires_in: 3600 }];
   }
   if (/\/me\/calendars?(\/cal1)?\/calendarView/.test(url)) {
     return [200, {
-      value: [{ id: 'evt-standup', bodyPreview: 'Bitte Status vorbereiten.', subject: 'Standup', isAllDay: false, start: { dateTime: '2026-10-01T07:00:00.0000000' },
+      value: [{ id: 'evt-standup', bodyPreview: 'Bitte Status vorbereiten.', subject: 'Standup', isAllDay: false,
+                isOrganizer: true, attendees: [], start: { dateTime: '2026-10-01T07:00:00.0000000' },
                 end: { dateTime: '2026-10-01T07:15:00.0000000' }, location: { displayName: 'Teams' } }],
       '@odata.nextLink': 'https://graph.microsoft.com/v1.0/page2'
     }];
@@ -197,7 +205,45 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
             assert.strictEqual(notes[0].NOTE_TEXT, 'Bitte Status vorbereiten.');
             assert.strictEqual(notes[1].EVT_KEY, 4711);
             assert.strictEqual(notes[1].NOTE_TEXT, '');
-            console.log('Simulation ok');
+            assert.ok(/Calendars\.Read /.test(lastScope + ' ') && !/ReadWrite/.test(lastScope), 'ohne Verschieben nur Leserechte');
+
+            // Verschieben einschalten -> einmalige Neuanmeldung mit Schreibrechten
+            sent = [];
+            var polls = tokenPolls;
+            fire('showConfiguration');
+            waitFor(function() { return !!global.openedUrl; }, 1000, function() {
+              fire('webviewclosed', { response: encodeURIComponent(JSON.stringify({
+                CFG_MOVE: { value: true }, CFG_MOVE_SCOPE: { value: 'solo' },
+                CFG_MOVE_OPTS: { value: [false, true, false, true] }
+              })) });
+              waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; }); }, 3000, function() {
+                assert.ok(/Calendars\.ReadWrite/.test(lastScope), 'Login mit Schreibrechten');
+                assert.ok(tokenPolls > polls, 'neue Anmeldung');
+                assert.ok(sent.some(function(m) { return m.MSG_TYPE === 4; }), 'Login-Code an die Uhr');
+                var s5 = sent.filter(function(m) { return m.MSG_TYPE === 5; }).pop();
+                assert.strictEqual(s5.SET_MOVE_OPTS, 10);
+                var ev = sent.filter(function(m) { return m.MSG_TYPE === 1 && m.EVT_TITLE === 'Standup'; })[0];
+                assert.strictEqual(ev.EVT_FLAGS, 1, 'eigener Termin ohne Teilnehmer ist verschiebbar');
+
+                // 1 Tag später -> PATCH; 1 Stunde später (nicht freigegeben) -> abgelehnt
+                sent = [];
+                fire('appmessage', { payload: { MSG_TYPE: 13, EVT_KEY: ev.EVT_KEY, MOVE_OPT: 1 } });
+                fire('appmessage', { payload: { MSG_TYPE: 13, EVT_KEY: ev.EVT_KEY, MOVE_OPT: 0 } });
+                waitFor(function() { return sent.filter(function(m) { return m.MSG_TYPE === 7; }).length >= 2; }, 2000, function() {
+                  var results = sent.filter(function(m) { return m.MSG_TYPE === 7; });
+                  var denied = results.filter(function(r) { return !r.MOVE_OK; })[0];
+                  var okRes = results.filter(function(r) { return r.MOVE_OK; })[0];
+                  assert.ok(denied && okRes, 'ein Erfolg, eine Ablehnung');
+                  assert.strictEqual(patches.length, 1);
+                  assert.ok(/\/me\/events\/evt-standup$/.test(patches[0].url));
+                  assert.deepStrictEqual(patches[0].body, {
+                    start: { dateTime: '2026-10-02T07:00:00', timeZone: 'UTC' },
+                    end: { dateTime: '2026-10-02T07:15:00', timeZone: 'UTC' }
+                  });
+                  console.log('Simulation ok');
+                });
+              });
+            });
           });
         });
       });
