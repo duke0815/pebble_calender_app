@@ -48,6 +48,7 @@ docs/help.md         User help (linked from the store)
 docs/privacy.md      Privacy policy
 store/listing.md     Store texts
 store/screenshots/   Store screenshots (from tools/screenshots.sh)
+store/assets/        Store icons (144, 48) and banner (720x320) – from tools/store_assets.py (Pillow)
 ```
 
 Before every commit: `TZ=Europe/Vienna node test/lib.test.js && TZ=Europe/Vienna node test/index.sim.js && sh test/c/run.sh`. The stub (`test/c/stub/pebble.h`) must be extended for new SDK calls – with the real signatures.

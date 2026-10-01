@@ -58,6 +58,9 @@ Your Microsoft 365 / Outlook calendar on your Pebble – day view, offline, dail
 - Help: _public URL to be decided_ (text: `docs/help.md`)
 - Source: the repository is private – leave empty
 
+## Icons and banner
+`store/assets/`: `icon-144.png` (144×144), `icon-48.png` (48×48), `banner-720x320.png` – generated with `python3 tools/store_assets.py` (same calendar motif as the menu icon).
+
 ## Screenshots
 In `store/screenshots/` (`<platform>-<n>-<name>.png`), generated automatically with `sh tools/screenshots.sh` (demo mode with neutral English sample data). Per platform (emery, basalt, diorite, flint):
 1. Day view of today
