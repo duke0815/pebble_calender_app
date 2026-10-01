@@ -7,6 +7,10 @@ Pebble-Watchapp, die Office-365-Kalendertermine anzeigt (heute bzw. die nächste
 
 **Grundprinzip: kein eigener Server.** Daten fließen ausschließlich Microsoft Graph → Handy (PebbleKit JS) → Uhr. Tokens bleiben am Handy des Nutzers.
 
+## Git
+- **Immer direkt auf `main` committen und pushen** (Wunsch des Projektinhabers). Keine Feature-Branches, keine Pull Requests, außer ausdrücklich verlangt.
+- Vor jedem Commit die Tests laufen lassen (siehe „Architektur“).
+
 ## Plattform & Tooling
 - Zielgerät: Pebble Time 2 (`emery`, 200×228, Farbe). Zusätzlich gebaut für `basalt` und `diorite`; Layout rechnet relativ zu den Layer-Bounds, nicht mit festen Pixeln.
 - Pebble SDK: C (Uhr) + PebbleKit JS (Handy) + Clay (Einstellungsseite).
