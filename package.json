@@ -50,7 +50,8 @@
       "SET_COLOR_TEXT",
       "SET_COLOR_BG",
       "EVT_KEY",
-      "NOTE_TEXT"
+      "NOTE_TEXT",
+      "SET_TOUCH"
     ],
     "resources": {
       "media": [

@@ -70,6 +70,13 @@ function buildConfig(calendars, settings, loggedIn) {
         },
         {
           type: 'toggle',
+          messageKey: 'CFG_TOUCH',
+          label: t('cfgTouch'),
+          description: t('cfgTouchDesc'),
+          defaultValue: settings.touch
+        },
+        {
+          type: 'toggle',
           messageKey: 'CFG_ALLDAY',
           label: t('cfgShowAllDay'),
           defaultValue: settings.showAllDay
@@ -163,6 +170,7 @@ function applyResult(result, calendars, settings) {
                               .map(function(c) { return c.id; });
   }
   next.showAllDay = !!value(result, 'CFG_ALLDAY', next.showAllDay);
+  next.touch = !!value(result, 'CFG_TOUCH', next.touch);
   next.hideDeclined = !!value(result, 'CFG_HIDE_DECLINED', next.hideDeclined);
   next.briefEnabled = !!value(result, 'CFG_BRIEF', next.briefEnabled);
   var t = lib.parseTime(value(result, 'CFG_BRIEF_TIME', next.briefTime));

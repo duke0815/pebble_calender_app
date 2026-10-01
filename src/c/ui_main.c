@@ -25,7 +25,16 @@
 
 #define DAY_ANIM_MS  220
 
-#define PAD_X        6
+#if defined(PBL_PLATFORM_EMERY)
+  #define CARD_GAP   8   // ~1 mm Luft zwischen den Terminen (Pebble Time 2, ~200 ppi)
+#else
+  #define CARD_GAP   5
+#endif
+#define CARD_MARGIN  4   // Abstand Rahmen <-> Displayrand
+#define CARD_RADIUS  4
+#define DAY_LONG_PRESS_MS 400
+
+#define PAD_X        (CARD_MARGIN + 6)
 #define PAD_Y        2
 #define HEADER_H     (H_TIME + 4)
 #define INFO_ROW_H   (H_TITLE * 3 + 2 * PAD_Y)
@@ -41,6 +50,9 @@ static GRect s_menu_frame;
 static char s_date_text[32];
 static char s_status_text[64];
 static char s_empty_text[96];
+
+// Auswahl erst nach einem Tastendruck zeigen (vorher kein Termin hervorgehoben)
+static bool s_selection_visible;
 
 static void prv_interaction(void) {
   if (s_callbacks.interaction) s_callbacks.interaction();
@@ -70,7 +82,7 @@ static int16_t prv_header_height(MenuLayer *menu, uint16_t section, void *ctx) {
 static int16_t prv_cell_height(MenuLayer *menu, MenuIndex *index, void *ctx) {
   if (prv_is_info()) return INFO_ROW_H;
   const CalEvent *e = events_view_get(index->row);
-  int16_t h = 2 * PAD_Y + H_TIME + H_TITLE;
+  int16_t h = CARD_GAP + 2 * PAD_Y + H_TIME + H_TITLE;
   if (e && e->location[0]) h += H_LOC;
   return h;
 }
@@ -86,15 +98,26 @@ static void prv_draw_header(GContext *ctx, const Layer *cell, uint16_t section, 
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
+// Jeder Termin ist ein Kasten mit Rahmen; die halbe Lücke liegt oben und unten in der Zeile.
 static void prv_draw_event(GContext *ctx, const Layer *cell, const CalEvent *e) {
   GRect bounds = layer_get_bounds(cell);
-  bool highlighted = menu_cell_layer_is_highlighted(cell);
+  bool highlighted = s_selection_visible && menu_cell_layer_is_highlighted(cell);
   bool past = e->end <= time(NULL);
+
+  GRect card = GRect(CARD_MARGIN, CARD_GAP / 2, bounds.size.w - 2 * CARD_MARGIN,
+                     bounds.size.h - CARD_GAP);
+  if (highlighted) {
+    graphics_context_set_fill_color(ctx, theme_accent());
+    graphics_fill_rect(ctx, card, CARD_RADIUS, GCornersAll);
+  }
+  graphics_context_set_stroke_color(ctx, highlighted ? theme_accent() : (past ? theme_muted() : theme_text()));
+  graphics_draw_round_rect(ctx, card, CARD_RADIUS);
+
   GColor text_color = highlighted ? theme_on_accent() : (past ? theme_muted() : theme_text());
   graphics_context_set_text_color(ctx, text_color);
 
   int16_t w = bounds.size.w - 2 * PAD_X;
-  int16_t y = PAD_Y;
+  int16_t y = CARD_GAP / 2 + PAD_Y;
   char time_text[24];
   format_event_time(e, time_text, sizeof(time_text));
 
@@ -115,7 +138,7 @@ static void prv_draw_event(GContext *ctx, const Layer *cell, const CalEvent *e) 
 
 static void prv_draw_info(GContext *ctx, const Layer *cell) {
   GRect bounds = layer_get_bounds(cell);
-  graphics_context_set_text_color(ctx, menu_cell_layer_is_highlighted(cell) ? theme_on_accent() : theme_text());
+  graphics_context_set_text_color(ctx, theme_text());
   graphics_draw_text(ctx, s_empty_text, fonts_get_system_font(FONT_TITLE),
                      GRect(PAD_X, PAD_Y, bounds.size.w - 2 * PAD_X, bounds.size.h - 2 * PAD_Y),
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
@@ -141,22 +164,42 @@ static void prv_selection_changed(MenuLayer *menu, MenuIndex new_index, MenuInde
   prv_interaction();
 }
 
-#if defined(PBL_TOUCH)
-// Eigene Tastenbelegung (wie MenuLayer), damit "Zurück" abgefangen werden kann: Die
-// Touch-Navigation meldet Wischen nach rechts als BACK, das soll die App nicht schließen.
-static void prv_click_up(ClickRecognizerRef recognizer, void *context) {
+// Eigene Tastenbelegung (wie MenuLayer, plus):
+// - der erste Tastendruck blendet nur die Auswahl ein,
+// - hoch/runter lang drücken = vorheriger/nächster Tag,
+// - "Zurück" geht über einen Callback (die Touch-Navigation meldet "rechts wischen" als BACK).
+static bool prv_reveal_selection(void) {
   prv_interaction();
+  if (s_selection_visible || prv_is_info()) return false;
+  s_selection_visible = true;
+  layer_mark_dirty(menu_layer_get_layer(s_menu_layer));
+  return true;
+}
+
+static void prv_click_up(ClickRecognizerRef recognizer, void *context) {
+  if (prv_reveal_selection()) return;
   menu_layer_set_selected_next(s_menu_layer, true, MenuRowAlignCenter, true);
 }
 
 static void prv_click_down(ClickRecognizerRef recognizer, void *context) {
-  prv_interaction();
+  if (prv_reveal_selection()) return;
   menu_layer_set_selected_next(s_menu_layer, false, MenuRowAlignCenter, true);
 }
 
 static void prv_click_select(ClickRecognizerRef recognizer, void *context) {
+  if (prv_reveal_selection()) return;
   MenuIndex index = menu_layer_get_selected_index(s_menu_layer);
   prv_select(s_menu_layer, &index, NULL);
+}
+
+static void prv_long_up(ClickRecognizerRef recognizer, void *context) {
+  prv_interaction();
+  if (s_callbacks.change_day) s_callbacks.change_day(-1);
+}
+
+static void prv_long_down(ClickRecognizerRef recognizer, void *context) {
+  prv_interaction();
+  if (s_callbacks.change_day) s_callbacks.change_day(1);
 }
 
 static void prv_click_back(ClickRecognizerRef recognizer, void *context) {
@@ -168,12 +211,13 @@ static void prv_click_back(ClickRecognizerRef recognizer, void *context) {
 }
 
 static void prv_click_config(void *context) {
-  window_single_repeating_click_subscribe(BUTTON_ID_UP, 100, prv_click_up);
-  window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 100, prv_click_down);
+  window_single_click_subscribe(BUTTON_ID_UP, prv_click_up);
+  window_single_click_subscribe(BUTTON_ID_DOWN, prv_click_down);
+  window_long_click_subscribe(BUTTON_ID_UP, DAY_LONG_PRESS_MS, prv_long_up, NULL);
+  window_long_click_subscribe(BUTTON_ID_DOWN, DAY_LONG_PRESS_MS, prv_long_down, NULL);
   window_single_click_subscribe(BUTTON_ID_SELECT, prv_click_select);
   window_single_click_subscribe(BUTTON_ID_BACK, prv_click_back);
 }
-#endif
 
 // ---------------------------------------------------------------------------
 // Fenster
@@ -201,11 +245,7 @@ static void prv_window_load(Window *window) {
     .select_click = prv_select,
     .selection_changed = prv_selection_changed,
   });
-#if defined(PBL_TOUCH)
   window_set_click_config_provider(window, prv_click_config);
-#else
-  menu_layer_set_click_config_onto_window(s_menu_layer, window);
-#endif
   layer_add_child(root, menu_layer_get_layer(s_menu_layer));
   ui_main_apply_theme();
 }
@@ -239,7 +279,8 @@ void ui_main_apply_theme(void) {
   }
   if (s_menu_layer) {
     menu_layer_set_normal_colors(s_menu_layer, theme_bg(), theme_text());
-    menu_layer_set_highlight_colors(s_menu_layer, theme_accent(), theme_on_accent());
+    // Die Auswahl zeichnet prv_draw_event selbst als gefüllten Kasten (und nur, wenn sichtbar)
+    menu_layer_set_highlight_colors(s_menu_layer, theme_bg(), theme_text());
     layer_mark_dirty(menu_layer_get_layer(s_menu_layer));
   }
 }
@@ -282,6 +323,7 @@ static void prv_day_anim_stopped(Animation *animation, bool finished, void *cont
 }
 
 void ui_main_animate_day(int delta) {
+  s_selection_visible = false;  // neuer Tag: wieder ohne hervorgehobenen Termin
   if (!s_menu_layer || delta == 0) return;
   prv_stop_day_anim();
   GRect to = s_menu_frame;

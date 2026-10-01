@@ -81,6 +81,7 @@ Clay-Config wird beim Öffnen (`showConfiguration`) **dynamisch** aus der gecach
 | Kalender | Checkbox-Gruppe (Default: Standardkalender) |
 | Ganztägige Termine anzeigen | Toggle (Default an) |
 | Abgelehnte Termine ausblenden | Toggle (Default an) |
+| Touch-Bedienung | Toggle (Default an); aus = kein Wischen/Tippen, Tageswechsel nur per Tasten |
 | Sprache | Auswahl: Automatisch (wie Handy, `navigator.language`) / Deutsch / English |
 | Akzentfarbe | Farbwähler (Default `0055AA` Kobaltblau): Datumsleiste + ausgewählter Termin |
 | Schriftfarbe | Farbwähler (Default `000000`) |
@@ -116,6 +117,7 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 | `SET_BRIEF_HOUR` / `SET_BRIEF_MINUTE` | int | Briefing-Uhrzeit |
 | `SET_BRIEF_DAYS` | int | Bitmaske, Bit 0 = Sonntag … Bit 6 = Samstag (wie `tm_wday`); Mo–Fr = 62 |
 | `SET_LANG` | int | 0 = Deutsch, 1 = Englisch (in JS aus „Automatisch“ aufgelöst) |
+| `SET_TOUCH` | int | 1 = Touch-Bedienung an, 0 = aus (Uhr speichert invertiert als `touch_off`, damit alte Settings „an“ bedeuten) |
 | `SET_COLOR_ACCENT` / `SET_COLOR_TEXT` / `SET_COLOR_BG` | int | 0xRRGGBB, auf der Uhr per `GColorFromHEX()` |
 
 - **Genau eine Synchronisierung pro App-Start:** JS synchronisiert beim `ready`-Event; die Uhr sendet beim Start nichts, sondern wartet (Statuszeile „Aktualisiere...“, Timeout) und zeigt bis dahin den Cache. Kein manuelles Aktualisieren, kein periodisches Nachladen.
@@ -129,13 +131,16 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 
 ## Watchapp (C)
 - **Leiste oben:** immer das Datum des angezeigten Tages („Heute, Do 01.10.“, „Morgen, …“, „Sa 03.10.“). Darunter nur bei Bedarf eine schmale Statuszeile (Section-Header, sonst Höhe 0): „Aktualisiere...“, „Lade Tag...“, „Offline - Stand HH:MM“ oder Fehlertext. Im Normalfall kein „Stand“.
-- `MenuLayer` darunter, eigene Zeilenzeichnung: Uhrzeit-Spanne (bzw. „Ganztägig“), Titel, Ort. Vergangene Termine grau.
+- `MenuLayer` darunter, eigene Zeilenzeichnung: jeder Termin als **Kasten mit Rahmen** (Farbe = Schriftfarbe, vergangene grau, Radius 4) und ~1 mm Luft dazwischen (`CARD_GAP` 8 px auf emery); Inhalt: Uhrzeit-Spanne (bzw. „Ganztägig“), Titel, Ort.
+- **Keine Auswahl von Anfang an:** Erst der erste Tastendruck (hoch/runter/Select) blendet die Auswahl ein (gefüllter Kasten in Akzentfarbe), ohne sie zu bewegen. Beim Tageswechsel wieder aus. Die MenuLayer-Highlight-Farben sind deshalb = Normalfarben; die Hervorhebung zeichnet `prv_draw_event` selbst.
+- **Tasten (alle Plattformen, eigene Click-Config):** hoch/runter = Auswahl, **lang drücken (400 ms) = vorheriger/nächster Tag**, Select = Details, Zurück = App beenden.
 - **Tagesansicht:** immer genau ein Tag (max. 12 Termine). Termine, die vor dem Tag begonnen haben, erscheinen mit.
 - **Touch (nur `PBL_TOUCH`, Pebble Time 2):**
   - Vertikales Scrollen, Tippen und „rechts wischen = zurück“ in der Detailansicht macht die **Touch-Navigation von PebbleOS** (`app_touch_navigation_enable(true)`): Inhalt folgt dem Finger 1:1, mit Schwung; Tippen auf einen Termin öffnet ihn. **Kein eigenes stufenweises Scrollen** (wurde als unangenehm empfunden). Funktioniert nur, wenn die Touch-Navigation in den Uhr-Einstellungen eingeschaltet ist.
   - Horizontal in der Tagesansicht wertet die App selbst aus (`touch_service_subscribe()`): links = nächster Tag, rechts = vorheriger Tag. Die Touch-Navigation meldet „rechts wischen“ zusätzlich als BACK-Taste → das Hauptfenster hat eine eigene Tastenbelegung (wie MenuLayer) und ignoriert BACK, solange der Finger liegt oder das Abheben < 600 ms her ist; echte Zurück-Taste beendet die App.
   - Ob eine Geste den Tag wechselt, entscheidet das Fenster beim **Aufsetzen** des Fingers (nur Tagesansicht). Das System verarbeitet Touch-Events vor dem App-Handler; „rechts wischen“ in der Detailansicht schließt diese schon vor unserem Liftoff – sonst würde zusätzlich ein Tag zurückgeblättert.
-  - Blätterbereich: −60 bis +90 Tage. Andere Plattformen: keine Tagesnavigation.
+  - Blätterbereich: −60 bis +90 Tage. Ohne Touch (Einstellung aus oder andere Plattform): Tageswechsel per langem Tastendruck.
+  - Einstellung „Touch-Bedienung“ aus → `touch_service_unsubscribe()` + `app_touch_navigation_enable(false)`.
   - Beim Tageswechsel gleitet die Liste herein (`ui_main_animate_day`: Frame-Animation des MenuLayers ab halber Breite, 220 ms, EaseOut; nächster Tag von rechts, vorheriger von links). Eine laufende Animation wird bei erneutem Wischen abgebrochen.
 - Tage im Cache (heute/morgen) kommen sofort; andere Tage fordert die Uhr an („Lade Tag...“, Timeout 15 s; ist der Sendepuffer belegt, bis zu 8 Versuche im 250-ms-Abstand). Tageslisten werden nur übernommen, wenn sie zum gerade angezeigten Tag gehören (verspätete Antworten werden verworfen). Um Mitternacht springt die Ansicht mit, wenn „heute“ angezeigt war.
 - Keine Aktions-Einträge (kein „Aktualisieren“/„Anmelden“) – bewusst entfernt.

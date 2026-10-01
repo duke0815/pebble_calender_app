@@ -7,7 +7,8 @@ typedef struct {
   uint8_t brief_minute;
   uint8_t brief_days;   // Bit 0 = Sonntag ... Bit 6 = Samstag
   uint8_t lang;         // LANG_DE / LANG_EN (i18n.h)
-  uint8_t reserved[3];
+  uint8_t touch_off;     // 1 = Touch-Bedienung aus (0 = an, damit alte Settings "an" bedeuten)
+  uint8_t reserved[2];
   uint32_t color_accent;  // 0xRRGGBB
   uint32_t color_text;
   uint32_t color_bg;

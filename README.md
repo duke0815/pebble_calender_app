@@ -53,7 +53,8 @@ Einstellungen (Kalender, Sprache Deutsch/Englisch, Farben, Briefing) findest du 
 ## Bedienung
 
 - **Tagesansicht:** bis zu 12 Termine eines Tages, vergangene grau. Oben steht immer das Datum des angezeigten Tages; darunter nur bei Bedarf „Aktualisiere...“, „Offline – Stand HH:MM“ oder ein Fehler.
-- **Wischen (Pebble Time 2):** links = nächster Tag, rechts = vorheriger Tag, hoch/runter = flüssig scrollen. Heute und morgen sind sofort da (auch offline), andere Tage werden vom Handy geladen. Für das flüssige Scrollen und Tippen muss auf der Uhr die **Touch-Navigation** eingeschaltet sein (Einstellungen der Uhr).
+- **Tasten:** hoch/runter = Termin auswählen (der erste Druck zeigt nur die Auswahl), **lang drücken = vorheriger/nächster Tag**, Select = Details.
+- **Wischen (Pebble Time 2, abschaltbar in den Einstellungen):** links = nächster Tag, rechts = vorheriger Tag, hoch/runter = flüssig scrollen. Heute und morgen sind sofort da (auch offline), andere Tage werden vom Handy geladen. Für das flüssige Scrollen und Tippen muss auf der Uhr die **Touch-Navigation** eingeschaltet sein (Einstellungen der Uhr).
 - **Termin öffnen:** antippen oder Select. Die Detailansicht zeigt auch die Beschreibung aus Outlook – sie wird beim Öffnen vom Handy geladen; ist das Handy nicht in Reichweite, steht dort ein Hinweis. Wischen hoch/runter scrollt, nach rechts wischen geht zurück.
 - **Aktualisieren:** automatisch einmal beim Öffnen der App.
 - **Konto wechseln:** in den Einstellungen „Abmelden“, dann die App neu öffnen.

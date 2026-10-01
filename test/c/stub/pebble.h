@@ -40,7 +40,7 @@ typedef struct { int16_t w, h; } GSize;
 typedef struct { GPoint origin; GSize size; } GRect;
 #define GRect(x,y,w,h) ((GRect){{(x),(y)},{(w),(h)}})
 #define GSize(w,h) ((GSize){(w),(h)})
-typedef enum { GCornerNone = 0 } GCornerMask;
+typedef enum { GCornerNone = 0, GCornersAll = 15 } GCornerMask;
 typedef enum { GTextAlignmentLeft, GTextAlignmentCenter, GTextAlignmentRight } GTextAlignment;
 typedef enum { GTextOverflowModeWordWrap, GTextOverflowModeTrailingEllipsis, GTextOverflowModeFill } GTextOverflowMode;
 
@@ -70,6 +70,7 @@ typedef void (*ClickHandler)(ClickRecognizerRef recognizer, void *context);
 typedef void (*ClickConfigProvider)(void *context);
 void window_set_click_config_provider(Window *window, ClickConfigProvider click_config_provider);
 void window_single_click_subscribe(ButtonId button_id, ClickHandler handler);
+void window_long_click_subscribe(ButtonId button_id, uint16_t delay_ms, ClickHandler down_handler, ClickHandler up_handler);
 void window_single_repeating_click_subscribe(ButtonId button_id, uint16_t repeat_interval_ms, ClickHandler handler);
 void window_stack_pop_all(const bool animated);
 
@@ -150,6 +151,8 @@ void menu_cell_basic_draw(GContext *ctx, const Layer *cell_layer, const char *ti
 void graphics_context_set_fill_color(GContext *ctx, GColor color);
 void graphics_context_set_text_color(GContext *ctx, GColor color);
 void graphics_fill_rect(GContext *ctx, GRect rect, uint16_t corner_radius, GCornerMask corner_mask);
+void graphics_context_set_stroke_color(GContext *ctx, GColor color);
+void graphics_draw_round_rect(GContext *ctx, GRect rect, uint16_t radius);
 void graphics_draw_text(GContext *ctx, const char *text, GFont const font, const GRect box, const GTextOverflowMode overflow_mode, const GTextAlignment alignment, GTextAttributes *text_attributes);
 GSize graphics_text_layout_get_content_size(const char *text, GFont const font, const GRect box, const GTextOverflowMode overflow_mode, const GTextAlignment alignment);
 
@@ -181,7 +184,7 @@ extern uint32_t MESSAGE_KEY_MSG_TYPE, MESSAGE_KEY_EVT_INDEX, MESSAGE_KEY_EVT_COU
   MESSAGE_KEY_SET_BRIEF_ENABLED, MESSAGE_KEY_SET_BRIEF_HOUR, MESSAGE_KEY_SET_BRIEF_MINUTE,
   MESSAGE_KEY_SET_BRIEF_DAYS, MESSAGE_KEY_REQ_DAY, MESSAGE_KEY_LIST_DAY, MESSAGE_KEY_LIST_DAYS,
   MESSAGE_KEY_SET_LANG, MESSAGE_KEY_SET_COLOR_ACCENT, MESSAGE_KEY_SET_COLOR_TEXT, MESSAGE_KEY_SET_COLOR_BG,
-  MESSAGE_KEY_EVT_KEY, MESSAGE_KEY_NOTE_TEXT;
+  MESSAGE_KEY_EVT_KEY, MESSAGE_KEY_NOTE_TEXT, MESSAGE_KEY_SET_TOUCH;
 
 typedef int32_t status_t;
 typedef enum { S_SUCCESS = 0, E_ERROR = -1, E_RANGE = -8 } StatusCode;

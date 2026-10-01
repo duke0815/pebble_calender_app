@@ -3,7 +3,8 @@
 
 typedef struct {
   void (*interaction)(void);   // jede Benutzeraktion (für Inaktivitäts-Timer)
-  void (*back)(void);          // Zurück-Taste in der Tagesansicht (nur Touch-Plattformen)
+  void (*back)(void);          // Zurück-Taste in der Tagesansicht
+  void (*change_day)(int delta);  // hoch/runter lang drücken: -1 / +1 Tag
 } UiMainCallbacks;
 
 void ui_main_push(UiMainCallbacks callbacks);

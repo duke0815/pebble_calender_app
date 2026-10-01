@@ -166,6 +166,7 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
         assert.strictEqual(settingsMsg.SET_BRIEF_DAYS, 62);
         assert.strictEqual(settingsMsg.SET_MODE, undefined);
         assert.strictEqual(settingsMsg.SET_LANG, 1);
+        assert.strictEqual(settingsMsg.SET_TOUCH, 1);
         assert.strictEqual(settingsMsg.SET_COLOR_ACCENT, 0xAA0000);
         assert.strictEqual(settingsMsg.SET_COLOR_BG, 0xFFFFFF);
         var statusMsg = sent.filter(function(m) { return m.MSG_TYPE === 3; })[0];

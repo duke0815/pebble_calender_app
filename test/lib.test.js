@@ -201,6 +201,8 @@ test('Clay: Farben und Sprache', function() {
   var bad = config.applyResult({ CFG_LANG: { value: 'xx' }, CFG_COLOR_BG: { value: 'kaputt' } }, [], settings);
   assert.strictEqual(bad.settings.language, 'auto');
   assert.strictEqual(bad.settings.bgColor, 0xFFFFFF);
+  assert.strictEqual(settings.touch, true);
+  assert.strictEqual(config.applyResult({ CFG_TOUCH: { value: false } }, [], settings).settings.touch, false);
 });
 
 test('Beschreibung: Kennung und Aufbereitung', function() {

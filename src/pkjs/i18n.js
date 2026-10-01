@@ -25,6 +25,9 @@ var STRINGS = {
     cfgShowAllDay: 'Ganztägige Termine anzeigen',
     cfgHideDeclined: 'Abgelehnte Termine ausblenden',
     cfgLanguage: 'Sprache',
+    cfgTouch: 'Touch-Bedienung',
+    cfgTouchDesc: 'Wischen links/rechts wechselt den Tag, hoch/runter scrollt, Tippen öffnet einen Termin. ' +
+                  'Ohne Touch: hoch/runter lang drücken wechselt den Tag.',
     cfgLangAuto: 'Automatisch (wie Handy)',
     cfgColors: 'Farben',
     cfgColorAccent: 'Akzentfarbe',
@@ -65,6 +68,9 @@ var STRINGS = {
     cfgShowAllDay: 'Show all-day events',
     cfgHideDeclined: 'Hide declined events',
     cfgLanguage: 'Language',
+    cfgTouch: 'Touch control',
+    cfgTouchDesc: 'Swipe left/right to change the day, up/down to scroll, tap to open an event. ' +
+                  'Without touch: long-press up/down to change the day.',
     cfgLangAuto: 'Automatic (like phone)',
     cfgColors: 'Colors',
     cfgColorAccent: 'Accent color',

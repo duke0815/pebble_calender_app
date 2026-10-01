@@ -154,7 +154,7 @@ static void prv_day_done(void) {
   }
 }
 
-#if defined(PBL_TOUCH)  // Tage blättern gibt es nur per Wischen
+// Tage blättern: per Wischen (Touch) oder hoch/runter lang drücken
 static int s_day_send_tries;
 
 static void prv_day_timeout(void *data) {
@@ -194,7 +194,6 @@ static void prv_change_day(int delta) {
   ui_main_reload(true);
   ui_main_animate_day(delta);
 }
-#endif
 
 
 // ---------------------------------------------------------------------------
@@ -266,7 +265,11 @@ static void prv_login_code(const char *url, const char *code) {
   ui_login_show(url, code);
 }
 
+
+static void prv_apply_touch_setting(void);
+
 static void prv_settings_changed(void) {
+  prv_apply_touch_setting();
   ui_main_apply_theme();
   prv_update_status();
   ui_main_reload(true);
@@ -349,6 +352,19 @@ static bool prv_back_is_from_touch(void) {
 }
 #endif
 
+static void prv_apply_touch_setting(void) {
+#if defined(PBL_TOUCH)
+  if (settings_get()->touch_off) {
+    touch_service_unsubscribe();
+    app_touch_navigation_enable(false);
+    s_finger_down = false;
+  } else {
+    touch_service_subscribe(prv_touch_handler, NULL);
+    app_touch_navigation_enable(true);
+  }
+#endif
+}
+
 static void prv_back(void) {
 #if defined(PBL_TOUCH)
   if (prv_back_is_from_touch()) {
@@ -419,14 +435,12 @@ static void prv_init(void) {
   ui_main_push((UiMainCallbacks) {
     .interaction = prv_interaction,
     .back = prv_back,
+    .change_day = prv_change_day,
   });
   ui_main_reload(true);
 
   wakeup_service_subscribe(prv_wakeup_handler);
-#if defined(PBL_TOUCH)
-  touch_service_subscribe(prv_touch_handler, NULL);
-  app_touch_navigation_enable(true);
-#endif
+  prv_apply_touch_setting();
   tick_timer_service_subscribe(MINUTE_UNIT, prv_tick);
 
   // Immer den nächsten Briefing-Zeitpunkt planen (auch nach einem Wakeup).
