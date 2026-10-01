@@ -38,6 +38,7 @@ static void prv_handle_event(DictionaryIterator *iter) {
   event.start = prv_int(iter, MESSAGE_KEY_EVT_START, 0);
   event.end = prv_int(iter, MESSAGE_KEY_EVT_END, 0);
   event.all_day = prv_int(iter, MESSAGE_KEY_EVT_ALLDAY, 0) ? 1 : 0;
+  event.key = prv_int(iter, MESSAGE_KEY_EVT_KEY, 0);
   prv_str(iter, MESSAGE_KEY_EVT_TITLE, event.title, sizeof(event.title));
   prv_str(iter, MESSAGE_KEY_EVT_LOCATION, event.location, sizeof(event.location));
   events_receive(index, &event);
@@ -84,6 +85,12 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
       if (s_handlers.login_code) s_handlers.login_code(url, code);
       break;
     }
+    case MSG_NOTE: {
+      static char note[NOTE_LEN];
+      prv_str(iter, MESSAGE_KEY_NOTE_TEXT, note, sizeof(note));
+      if (s_handlers.note) s_handlers.note(prv_int(iter, MESSAGE_KEY_EVT_KEY, 0), note);
+      break;
+    }
     case MSG_SETTINGS:
       prv_handle_settings(iter);
       if (s_handlers.settings_changed) s_handlers.settings_changed();
@@ -107,11 +114,21 @@ void comm_init(CommHandlers handlers) {
   app_message_register_inbox_received(prv_inbox_received);
   app_message_register_inbox_dropped(prv_inbox_dropped);
   app_message_register_outbox_failed(prv_outbox_failed);
-  app_message_open(512, 64);
+  app_message_open(640, 64);
 }
 
 void comm_deinit(void) {
   app_message_deregister_callbacks();
+}
+
+bool comm_request_note(int32_t key) {
+  DictionaryIterator *iter;
+  if (app_message_outbox_begin(&iter) != APP_MSG_OK) {
+    return false;
+  }
+  dict_write_int32(iter, MESSAGE_KEY_MSG_TYPE, MSG_NOTE_REQUEST);
+  dict_write_int32(iter, MESSAGE_KEY_EVT_KEY, key);
+  return app_message_outbox_send() == APP_MSG_OK;
 }
 
 bool comm_request(time_t day) {

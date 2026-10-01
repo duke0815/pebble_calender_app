@@ -49,7 +49,7 @@ function respond(method, url, body) {
   }
   if (/\/me\/calendars?(\/cal1)?\/calendarView/.test(url)) {
     return [200, {
-      value: [{ subject: 'Standup', isAllDay: false, start: { dateTime: '2026-10-01T07:00:00.0000000' },
+      value: [{ id: 'evt-standup', bodyPreview: 'Bitte Status vorbereiten.', subject: 'Standup', isAllDay: false, start: { dateTime: '2026-10-01T07:00:00.0000000' },
                 end: { dateTime: '2026-10-01T07:15:00.0000000' }, location: { displayName: 'Teams' } }],
       '@odata.nextLink': 'https://graph.microsoft.com/v1.0/page2'
     }];
@@ -184,7 +184,19 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
           assert.strictEqual(ends[0].LIST_DAYS, 1);
           assert.strictEqual(ends[1].LIST_DAY, d2);
           assert.ok(!sent.some(function(m) { return m.MSG_TYPE === 3; }), 'kein Status beim Blättern');
-          console.log('Simulation ok');
+          // Beschreibung anfordern: bekannte Kennung -> Text, unbekannte -> leer
+          sent = [];
+          var key = events[1].EVT_KEY;
+          fire('appmessage', { payload: { MSG_TYPE: 12, EVT_KEY: key } });
+          fire('appmessage', { payload: { MSG_TYPE: 12, EVT_KEY: 4711 } });
+          waitFor(function() { return sent.filter(function(m) { return m.MSG_TYPE === 6; }).length >= 2; }, 2000, function() {
+            var notes = sent.filter(function(m) { return m.MSG_TYPE === 6; });
+            assert.strictEqual(notes[0].EVT_KEY, key);
+            assert.strictEqual(notes[0].NOTE_TEXT, 'Bitte Status vorbereiten.');
+            assert.strictEqual(notes[1].EVT_KEY, 4711);
+            assert.strictEqual(notes[1].NOTE_TEXT, '');
+            console.log('Simulation ok');
+          });
         });
       });
     });

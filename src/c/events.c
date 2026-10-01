@@ -1,6 +1,6 @@
 #include "events.h"
 
-#define CACHE_VERSION 2
+#define CACHE_VERSION 3
 
 #define PERSIST_KEY_VERSION    1
 #define PERSIST_KEY_COUNT      2

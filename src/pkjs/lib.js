@@ -9,7 +9,9 @@ var MSG = {
   STATUS: 3,
   LOGIN_CODE: 4,
   SETTINGS: 5,
-  REQUEST: 10
+  NOTE: 6,
+  REQUEST: 10,
+  NOTE_REQUEST: 12
 };
 
 var STATUS = {
@@ -30,6 +32,8 @@ var TITLE_CHARS = 80;
 var TITLE_BYTES = 95;         // Puffer auf der Uhr: 96 inkl. '\0'
 var LOCATION_CHARS = 40;
 var LOCATION_BYTES = 47;      // Puffer auf der Uhr: 48 inkl. '\0'
+var NOTE_CHARS = 300;
+var NOTE_BYTES = 400;         // passt in eine AppMessage (Inbox 640 Byte auf der Uhr)
 
 var DEFAULT_SETTINGS = {
   calendars: [],              // leere Liste = Standardkalender
@@ -166,6 +170,43 @@ function maskToDays(mask) {
 // ---------------------------------------------------------------------------
 // Termine
 
+// Kurze Kennung (32 Bit, nie 0) für die lange Graph-ID – damit fragt die Uhr die
+// Beschreibung an, ohne die ID speichern zu müssen (FNV-1a).
+function eventKey(id) {
+  var h = 0x811c9dc5;
+  var s = String(id || '');
+  for (var i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul ? Math.imul(h, 0x01000193) : (h * 0x01000193) >>> 0;
+  }
+  h = h | 0;
+  return h === 0 ? 1 : h;
+}
+
+// Beschreibung (bodyPreview) für die Uhr aufbereiten: Teams-/Zoom-Einladungsblock
+// abschneiden, Leerzeilen zusammenfassen, Zeilenumbrüche behalten, kürzen.
+function cleanNotes(text) {
+  var s = String(text || '').replace(/\r\n?/g, '\n');
+  var cut = s.search(/_{8,}|-{8,}|Microsoft Teams[- ]?(Besprechung|meeting|Meeting)/);
+  if (cut >= 0) s = s.slice(0, cut);
+  s = s.split('\n').map(function(line) { return line.replace(/[ \t]+/g, ' ').trim(); }).join('\n');
+  s = s.replace(/\n{3,}/g, '\n\n').trim();
+  if (!s) return '';
+  // Kürzen wie truncate(), aber Zeilenumbrüche erhalten
+  var chars = codePoints(s);
+  var bytes = 0;
+  var out = '';
+  for (var i = 0; i < chars.length; i++) {
+    var len = utf8Length(chars[i]);
+    if (i + 1 + 3 > NOTE_CHARS || bytes + len + 3 > NOTE_BYTES) {
+      return out.replace(/\s+$/, '') + '...';
+    }
+    out += chars[i];
+    bytes += len;
+  }
+  return out;
+}
+
 function normalizeEvent(e) {
   if (!e || e.isCancelled) return null;
   var allDay = !!e.isAllDay;
@@ -179,6 +220,9 @@ function normalizeEvent(e) {
     start: start,
     end: end,
     allDay: allDay,
+    key: eventKey(e.id),
+    id: e.id || '',
+    notes: e.hasOwnProperty('bodyPreview') ? cleanNotes(e.bodyPreview) : null,
     title: truncate(e.subject || '', TITLE_CHARS, TITLE_BYTES),
     location: truncate((e.location && e.location.displayName) || '', LOCATION_CHARS, LOCATION_BYTES),
     declined: !!(e.responseStatus && e.responseStatus.response === 'declined')
@@ -293,6 +337,8 @@ module.exports = {
   daysToMask: daysToMask,
   maskToDays: maskToDays,
   normalizeEvent: normalizeEvent,
+  eventKey: eventKey,
+  cleanNotes: cleanNotes,
   selectEvents: selectEvents,
   classifyAuthError: classifyAuthError,
   graphErrorStatus: graphErrorStatus,

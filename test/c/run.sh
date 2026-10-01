@@ -4,7 +4,11 @@ set -e
 cd "$(dirname "$0")/../.."
 FLAGS="-std=gnu99 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-field-initializers -Itest/c/stub"
 for defs in "-DPBL_COLOR -DPBL_TOUCH -DPBL_PLATFORM_EMERY" "-DPBL_COLOR -DPBL_PLATFORM_BASALT" "-DPBL_BW -DPBL_PLATFORM_DIORITE"; do
-  gcc $FLAGS -fsyntax-only $defs src/c/*.c
+  OBJ=$(mktemp -d)
+  for f in src/c/*.c; do
+    gcc $FLAGS -O2 $defs -c "$f" -o "$OBJ/$(basename "$f" .c).o"
+  done
+  rm -rf "$OBJ"
 done
 echo "Syntax ok (emery, basalt, diorite)"
 OUT=$(mktemp)

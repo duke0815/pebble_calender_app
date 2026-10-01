@@ -21,6 +21,9 @@ static const char *const STRINGS[2][STR_COUNT] = {
     [STR_LOGIN_OPEN] = "Am PC/Handy öffnen:",
     [STR_LOGIN_ENTER] = "und Code eingeben:",
     [STR_LOGIN_HINT] = "App bis zum Abschluss offen lassen.",
+    [STR_NOTES_LOADING] = "Lade Beschreibung...",
+    [STR_NOTES_NEED_PHONE] = "Die Beschreibung benötigt die Nähe zum Handy.",
+    [STR_NOTES_NONE] = "Keine Beschreibung",
   },
   [LANG_EN] = {
     [STR_TODAY] = "Today",
@@ -41,6 +44,9 @@ static const char *const STRINGS[2][STR_COUNT] = {
     [STR_LOGIN_OPEN] = "On PC/phone open:",
     [STR_LOGIN_ENTER] = "and enter code:",
     [STR_LOGIN_HINT] = "Keep the app open until done.",
+    [STR_NOTES_LOADING] = "Loading description...",
+    [STR_NOTES_NEED_PHONE] = "The description needs the phone nearby.",
+    [STR_NOTES_NONE] = "No description",
   },
 };
 

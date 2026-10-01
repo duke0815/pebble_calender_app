@@ -5,6 +5,7 @@
 typedef struct {
   int32_t start;          // Epoch-Sekunden (ganztaegig: lokale Mitternacht)
   int32_t end;            // Epoch-Sekunden (ganztaegig: exklusive lokale Mitternacht)
+  int32_t key;            // Kennung für die Beschreibung (0 = keine)
   uint8_t all_day;
   char title[TITLE_LEN];
   char location[LOCATION_LEN];

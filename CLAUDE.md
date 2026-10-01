@@ -37,7 +37,7 @@ src/c/theme.c/.h     Farben aus den Settings + abgeleitete Kontrastfarben
 src/pkjs/i18n.js     Texte für Statusmeldungen und Einstellungsseite (Deutsch/Englisch)
 test/lib.test.js     Node-Tests für lib.js + config.js
 test/index.sim.js    Simulation von index.js (Pebble/XHR/localStorage gemockt)
-test/c/run.sh        C-Syntaxprüfung gegen Stub-pebble.h (emery/basalt/diorite) + native Logiktests
+test/c/run.sh        C-Kompilierung (-O2 -Werror) gegen Stub-pebble.h (emery/basalt/diorite) + native Logiktests
 ```
 
 Vor jedem Commit: `TZ=Europe/Vienna node test/lib.test.js && TZ=Europe/Vienna node test/index.sim.js && sh test/c/run.sh`. Der Stub (`test/c/stub/pebble.h`) muss bei neuen SDK-Aufrufen ergänzt werden – mit den echten Signaturen.
@@ -58,7 +58,7 @@ Zeitberechnung auf der Uhr nur über `time_make_local()` / `time_day_start()` (k
 
 ## Microsoft Graph
 - Kalenderliste: `GET /v1.0/me/calendars?$select=id,name,isDefaultCalendar` → in `localStorage` cachen (max. 1×/Tag automatisch erneuern, sonst beim Öffnen der Einstellungen).
-- Termine: `GET /v1.0/me/calendars/{id}/calendarView?startDateTime=…&endDateTime=…&$select=subject,start,end,isAllDay,location,isCancelled,showAs,responseStatus&$orderby=start/dateTime&$top=50`
+- Termine: `GET /v1.0/me/calendars/{id}/calendarView?startDateTime=…&endDateTime=…&$select=id,subject,bodyPreview,start,end,isAllDay,location,isCancelled,showAs,responseStatus&$orderby=start/dateTime&$top=50`
   - Ohne Kalenderauswahl: `/v1.0/me/calendar/calendarView` (Standardkalender).
   - Header `Prefer: outlook.timezone="UTC"` immer mitsenden.
   - calendarView liefert Serientermine bereits aufgelöst – **keinen eigenen RRULE-Parser bauen**.
@@ -70,6 +70,7 @@ Zeitberechnung auf der Uhr nur über `time_make_local()` / `time_day_start()` (k
   - **Ganztägige Termine:** nur das Datum verwenden, nicht verschieben. Konvention: `EVT_START` = **lokale Mitternacht** des Startdatums, `EVT_END` = lokale Mitternacht des (exklusiven) Enddatums, beides in JS berechnet.
 - Abgesagte (`isCancelled`) und optional abgelehnte Termine (`responseStatus.response == "declined"`) ausfiltern; ganztägige optional ausblenden.
 - Pagination (`@odata.nextLink`) berücksichtigen.
+- **Beschreibung (Outlook-Notiz):** `bodyPreview` (Klartext, max. 255 Zeichen) kommt mit der Terminliste. JS bereitet sie auf (`lib.cleanNotes`: Teams-/Einladungsblock ab `____`/„Microsoft Teams“ abschneiden, Leerzeilen zusammenfassen, Zeilenumbrüche behalten, max. 300 Zeichen / 400 Byte) und merkt sie sich mit einer 32-Bit-Kennung (`lib.eventKey`, FNV-1a der Graph-ID) in `localStorage` (`notes`, max. 80 Einträge). Fehlt sie dort, Fallback `GET /me/events/{id}?$select=bodyPreview`. Die Uhr speichert nur die Kennung (`EVT_KEY`), nicht den Text.
 - Fehler: 401 → einmal Token erneuern und wiederholen; 403 → „Kein Zugriff auf Kalender“; sonst „Graph-Fehler <Status>“; Status 0/Timeout → „Keine Verbindung“.
 
 ## Einstellungen (Clay)
@@ -98,12 +99,14 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 
 | Key | Typ | Inhalt |
 |---|---|---|
-| `MSG_TYPE` | int | Handy→Uhr: 1 = Termin, 2 = Ende der Liste, 3 = Status/Fehler, 4 = Login-Code, 5 = Settings. Uhr→Handy: 10 = REQUEST (Daten anfordern) |
+| `MSG_TYPE` | int | Handy→Uhr: 1 = Termin, 2 = Ende der Liste, 3 = Status/Fehler, 4 = Login-Code, 5 = Settings, 6 = Beschreibung. Uhr→Handy: 10 = REQUEST (Daten anfordern), 12 = Beschreibung anfordern |
 | `EVT_INDEX` / `EVT_COUNT` | int | Position / Gesamtzahl (`EVT_COUNT` auch bei MSG_TYPE 2) |
 | `EVT_START` / `EVT_END` | int32 | Epoch-Sekunden (ganztägig: lokale Mitternacht, s. o.) |
 | `EVT_ALLDAY` | int | 0/1 |
 | `EVT_TITLE` | cstring | max. 80 Zeichen **und** max. 95 Byte UTF-8, in JS gekürzt (`...`) |
 | `EVT_LOCATION` | cstring | max. 40 Zeichen **und** max. 47 Byte UTF-8 |
+| `EVT_KEY` | int32 | Kennung des Termins (bei MSG_TYPE 1, 6, 12) |
+| `NOTE_TEXT` | cstring | bei MSG_TYPE 6: aufbereitete Beschreibung (max. 400 Byte), leer = keine |
 | `LIST_DAY` / `LIST_DAYS` | int | bei MSG_TYPE 2: lokale Mitternacht (Epoch) des ersten Tages / Anzahl Tage (2 = Cache, 1 = einzelner Tag) |
 | `REQ_DAY` | int | bei MSG_TYPE 10: 0 = Cache neu laden, sonst lokale Mitternacht des gewünschten Tages (JS schickt sie als `LIST_DAY` unverändert zurück) |
 | `STATUS_CODE` | int | 1 = Synchronisiere, 2 = Anmeldung nötig, 3 = Admin-Freigabe nötig, 4 = Richtlinie blockiert, 5 = Keine Verbindung, 6 = Sonstiger Fehler, 7 = Konfiguration fehlt |
@@ -134,10 +137,10 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
   - Blätterbereich: −60 bis +90 Tage. Andere Plattformen: keine Tagesnavigation.
 - Tage im Cache (heute/morgen) kommen sofort; andere Tage fordert die Uhr an („Lade Tag...“, Timeout 15 s; ist der Sendepuffer belegt, bis zu 8 Versuche im 250-ms-Abstand). Tageslisten werden nur übernommen, wenn sie zum gerade angezeigten Tag gehören (verspätete Antworten werden verworfen). Um Mitternacht springt die Ansicht mit, wenn „heute“ angezeigt war.
 - Keine Aktions-Einträge (kein „Aktualisieren“/„Anmelden“) – bewusst entfernt.
-- Select auf einem Termin → Detailfenster (Datum, Zeit, voller Titel, Ort). Schrift dort bewusst klein: emery Titel GOTHIC_24_BOLD, Zeit GOTHIC_18_BOLD, Rest GOTHIC_18 (andere Plattformen eine Stufe kleiner).
+- Select/Tippen auf einem Termin → Detailfenster (Datum, Zeit, voller Titel, Ort, **Beschreibung**). Die Beschreibung wird beim Öffnen per `MSG_TYPE 12` nachgeladen („Lade Beschreibung...“, Timeout 8 s, Sende-Retry wie beim Tag). Ohne Handy-Verbindung/Timeout: „Die Beschreibung benötigt die Nähe zum Handy.“; leer: „Keine Beschreibung“. Nur im RAM, nie im Persist-Cache. AppMessage-Inbox der Uhr: 640 Byte. Schrift dort bewusst klein: emery Titel GOTHIC_24_BOLD, Zeit GOTHIC_18_BOLD, Rest GOTHIC_18 (andere Plattformen eine Stufe kleiner).
 - Minütlicher Tick → Ansicht neu berechnen (vergangene Termine, Tageswechsel).
 - **Cache:** jeder Termin unter eigenem Persist-Key (256-Byte-Limit pro Key) + Anzahl + Zeitstempel des letzten Syncs + Cache-Version. Beim Start sofort Cache anzeigen, dann aktualisieren.
-- **Speicherbudget:** Persistenter Speicher ist insgesamt ca. 4 KB pro App. Ein Termin belegt 156 Byte → **max. 16 Termine** im Cache (~2,5 KB) plus Settings. Nicht erhöhen, ohne nachzurechnen. Tagespuffer (12 Termine) nur im RAM.
+- **Speicherbudget:** Persistenter Speicher ist insgesamt ca. 4 KB pro App. Ein Termin belegt 160 Byte → **max. 16 Termine** im Cache (~2,6 KB) plus Settings. Nicht erhöhen, ohne nachzurechnen. Tagespuffer (12 Termine) nur im RAM.
 - Leerer Zustand: „Keine Termine heute“ bzw. „Keine Termine“; bei Fehlern der Fehlertext; ohne Daten/Verbindung „Keine Verbindung zum Handy.“
 - Timeout für eine Synchronisierung: 30 s (außer während des Logins), dann „Offline“.
 

@@ -45,8 +45,8 @@ static AppTimer *s_day_timer;
 // Statusanzeige
 
 static void prv_update_status(void) {
-  char status[64];
-  char stamp[24];
+  char status[STATUS_LEN];
+  char stamp[40];
   time_t last = events_last_sync();
   stamp[0] = '\0';
   if (last) {
@@ -141,7 +141,6 @@ static void prv_request_refresh(void) {
 // Tage blättern
 
 static AppTimer *s_day_send_timer;
-static int s_day_send_tries;
 
 static void prv_day_done(void) {
   s_day_loading = false;
@@ -155,6 +154,16 @@ static void prv_day_done(void) {
   }
 }
 
+#if defined(PBL_TOUCH)  // Tage blättern gibt es nur per Wischen
+static int s_day_send_tries;
+
+static void prv_day_timeout(void *data) {
+  s_day_timer = NULL;
+  prv_day_done();
+  prv_update_status();
+  ui_main_reload(false);
+}
+
 // Anfrage senden; ist der Sendepuffer noch belegt (schnelles Wischen), kurz später erneut.
 static void prv_day_send(void *data) {
   s_day_send_timer = NULL;
@@ -163,13 +172,6 @@ static void prv_day_send(void *data) {
   if (++s_day_send_tries < 8) {
     s_day_send_timer = app_timer_register(250, prv_day_send, NULL);
   }
-}
-
-static void prv_day_timeout(void *data) {
-  s_day_timer = NULL;
-  prv_day_done();
-  prv_update_status();
-  ui_main_reload(false);
 }
 
 static void prv_change_day(int delta) {
@@ -191,6 +193,7 @@ static void prv_change_day(int delta) {
   prv_update_status();
   ui_main_reload(true);
 }
+#endif
 
 
 // ---------------------------------------------------------------------------
@@ -266,6 +269,10 @@ static void prv_settings_changed(void) {
   ui_main_apply_theme();
   prv_update_status();
   ui_main_reload(true);
+}
+
+static void prv_note(int32_t key, const char *text) {
+  ui_detail_set_note(key, text);
 }
 
 static void prv_send_failed(void) {
@@ -402,6 +409,7 @@ static void prv_init(void) {
     .login_code = prv_login_code,
     .settings_changed = prv_settings_changed,
     .send_failed = prv_send_failed,
+    .note = prv_note,
   });
 
   ui_main_push((UiMainCallbacks) {

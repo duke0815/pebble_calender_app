@@ -16,7 +16,8 @@ var AUTHORITY = 'common';
 var SCOPE = 'https://graph.microsoft.com/Calendars.Read offline_access';
 var LOGIN_BASE = 'https://login.microsoftonline.com/' + AUTHORITY + '/oauth2/v2.0/';
 var GRAPH = 'https://graph.microsoft.com/v1.0';
-var EVENT_FIELDS = 'subject,start,end,isAllDay,location,isCancelled,showAs,responseStatus';
+var EVENT_FIELDS = 'id,subject,bodyPreview,start,end,isAllDay,location,isCancelled,showAs,responseStatus';
+var NOTES_INDEX_MAX = 80;
 var CALENDAR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 var TOKEN_MARGIN_MS = 5 * 60 * 1000;
 
@@ -113,7 +114,53 @@ function sendSettings(settings) {
 }
 
 // listDay: Epoch-Sekunden des ersten Tages, listDays: 2 = Cache (heute + morgen), 1 = ein Tag
+// --- Beschreibungen ---------------------------------------------------------
+// Kennung -> {id, notes}. Die Uhr kennt nur die Kennung (EVT_KEY) und fragt beim Öffnen
+// der Details nach (MSG_TYPE 12). In localStorage, damit es auch nach einem Neustart klappt.
+
+function rememberNotes(events) {
+  var index = load('notes', {});
+  events.forEach(function(e) {
+    index[e.key] = { id: e.id, notes: e.notes, t: Date.now() };
+  });
+  var keys = Object.keys(index);
+  if (keys.length > NOTES_INDEX_MAX) {
+    keys.sort(function(a, b) { return index[a].t - index[b].t; });
+    keys.slice(0, keys.length - NOTES_INDEX_MAX).forEach(function(k) { delete index[k]; });
+  }
+  save('notes', index);
+}
+
+function sendNote(key, text) {
+  enqueue({ MSG_TYPE: MSG.NOTE, EVT_KEY: key, NOTE_TEXT: text || '' });
+}
+
+function handleNoteRequest(key) {
+  var entry = load('notes', {})[key];
+  if (!entry) {
+    sendNote(key, '');
+    return;
+  }
+  if (entry.notes !== null && entry.notes !== undefined) {
+    sendNote(key, entry.notes);
+    return;
+  }
+  // Beschreibung war nicht in der Liste -> einzeln abfragen
+  getToken(function(err, token) {
+    if (err || !entry.id) {
+      sendNote(key, '');
+      return;
+    }
+    graphGet(GRAPH + '/me/events/' + encodeURIComponent(entry.id) + '?$select=bodyPreview', token,
+      function(status, json) {
+        var notes = status === 200 && json ? lib.cleanNotes(json.bodyPreview) : '';
+        sendNote(key, notes);
+      });
+  });
+}
+
 function sendEvents(events, listDay, listDays) {
+  rememberNotes(events);
   events.forEach(function(e, i) {
     enqueue({
       MSG_TYPE: MSG.EVENT,
@@ -123,7 +170,8 @@ function sendEvents(events, listDay, listDays) {
       EVT_END: e.end,
       EVT_ALLDAY: e.allDay ? 1 : 0,
       EVT_TITLE: e.title,
-      EVT_LOCATION: e.location
+      EVT_LOCATION: e.location,
+      EVT_KEY: e.key
     });
   });
   enqueue({ MSG_TYPE: MSG.END, EVT_COUNT: events.length, LIST_DAY: listDay, LIST_DAYS: listDays });
@@ -554,6 +602,8 @@ Pebble.addEventListener('appmessage', function(e) {
     } else {
       sync();
     }
+  } else if (type === MSG.NOTE_REQUEST) {
+    handleNoteRequest(payloadValue(e.payload || {}, 'EVT_KEY'));
   }
 });
 

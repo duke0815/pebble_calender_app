@@ -8,8 +8,10 @@
 #define MSG_STATUS       3
 #define MSG_LOGIN_CODE   4
 #define MSG_SETTINGS     5
+#define MSG_NOTE         6
 // MSG_TYPE: Uhr -> Handy
 #define MSG_REQUEST      10
+#define MSG_NOTE_REQUEST 12
 
 // STATUS_CODE
 #define STATUS_SYNCING        1
@@ -26,8 +28,10 @@
 #define STATUS_LEN    80
 #define LOGIN_URL_LEN 48
 #define LOGIN_CODE_LEN 16
+// Beschreibung (JS kürzt auf 400 Byte), nur im RAM für die Detailansicht
+#define NOTE_LEN      404
 
 // Termine pro Tag in der Ansicht
 #define MAX_DAY_EVENTS 12
-// Persist-Cache (heute + morgen): ~156 Byte pro Termin -> 16 * 156 = ~2,5 KB von 4 KB
+// Persist-Cache (heute + morgen): 160 Byte pro Termin -> 16 * 160 = ~2,6 KB von 4 KB
 #define MAX_CACHE_EVENTS 16

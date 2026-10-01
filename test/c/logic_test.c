@@ -60,6 +60,7 @@ int main(void) {
   printf("sizeof(CalEvent)=%zu, Cache gesamt=%zu Byte\n", sizeof(CalEvent), sizeof(CalEvent) * MAX_CACHE_EVENTS);
   assert(sizeof(CalEvent) <= 256);
   assert(sizeof(CalEvent) * MAX_CACHE_EVENTS <= 2600);
+  assert(sizeof(CalEvent) == 160);
 
   s_now = local(2026, 10, 1, 10, 0);  // Do 01.10.2026 10:00
   settings_load();

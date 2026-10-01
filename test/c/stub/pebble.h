@@ -76,6 +76,7 @@ void window_stack_pop_all(const bool animated);
 GRect layer_get_bounds(const Layer *layer);
 void layer_add_child(Layer *parent, Layer *child);
 void layer_mark_dirty(Layer *layer);
+void layer_set_frame(Layer *layer, GRect frame);
 
 TextLayer *text_layer_create(GRect frame);
 void text_layer_destroy(TextLayer *text_layer);
@@ -165,7 +166,8 @@ extern uint32_t MESSAGE_KEY_MSG_TYPE, MESSAGE_KEY_EVT_INDEX, MESSAGE_KEY_EVT_COU
   MESSAGE_KEY_STATUS_CODE, MESSAGE_KEY_STATUS_TEXT, MESSAGE_KEY_LOGIN_URL, MESSAGE_KEY_LOGIN_CODE,
   MESSAGE_KEY_SET_BRIEF_ENABLED, MESSAGE_KEY_SET_BRIEF_HOUR, MESSAGE_KEY_SET_BRIEF_MINUTE,
   MESSAGE_KEY_SET_BRIEF_DAYS, MESSAGE_KEY_REQ_DAY, MESSAGE_KEY_LIST_DAY, MESSAGE_KEY_LIST_DAYS,
-  MESSAGE_KEY_SET_LANG, MESSAGE_KEY_SET_COLOR_ACCENT, MESSAGE_KEY_SET_COLOR_TEXT, MESSAGE_KEY_SET_COLOR_BG;
+  MESSAGE_KEY_SET_LANG, MESSAGE_KEY_SET_COLOR_ACCENT, MESSAGE_KEY_SET_COLOR_TEXT, MESSAGE_KEY_SET_COLOR_BG,
+  MESSAGE_KEY_EVT_KEY, MESSAGE_KEY_NOTE_TEXT;
 
 typedef int32_t status_t;
 typedef enum { S_SUCCESS = 0, E_ERROR = -1, E_RANGE = -8 } StatusCode;

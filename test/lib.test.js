@@ -203,6 +203,23 @@ test('Clay: Farben und Sprache', function() {
   assert.strictEqual(bad.settings.bgColor, 0xFFFFFF);
 });
 
+test('Beschreibung: Kennung und Aufbereitung', function() {
+  var k = lib.eventKey('AAMkAGI2THVSAAA=');
+  assert.strictEqual(k, lib.eventKey('AAMkAGI2THVSAAA='));
+  assert.notStrictEqual(k, lib.eventKey('AAMkAGI2THVSAAB='));
+  assert.ok(k !== 0 && (k | 0) === k, 'int32, nie 0');
+  assert.strictEqual(lib.cleanNotes('Agenda:\r\n- Punkt 1\r\n\r\n\r\n- Punkt 2  '), 'Agenda:\n- Punkt 1\n\n- Punkt 2');
+  assert.strictEqual(lib.cleanNotes('Bitte Unterlagen mitbringen. ________________________________ Microsoft Teams-Besprechung Jetzt teilnehmen'),
+                     'Bitte Unterlagen mitbringen.');
+  assert.strictEqual(lib.cleanNotes('________________ Microsoft Teams meeting Join'), '');
+  var long = lib.cleanNotes('Ü'.repeat(400));
+  assert.ok(Buffer.byteLength(long, 'utf8') <= 400 && /\.\.\.$/.test(long));
+  var e = lib.normalizeEvent({ id: 'X1', subject: 'A', bodyPreview: 'Notiz', start: { dateTime: '2026-10-01T07:00:00' },
+                               end: { dateTime: '2026-10-01T08:00:00' } });
+  assert.strictEqual(e.notes, 'Notiz');
+  assert.strictEqual(e.key, lib.eventKey('X1'));
+});
+
 var failed = 0;
 tests.forEach(function(t) {
   try {

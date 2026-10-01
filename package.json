@@ -48,7 +48,9 @@
       "SET_LANG",
       "SET_COLOR_ACCENT",
       "SET_COLOR_TEXT",
-      "SET_COLOR_BG"
+      "SET_COLOR_BG",
+      "EVT_KEY",
+      "NOTE_TEXT"
     ],
     "resources": {
       "media": [

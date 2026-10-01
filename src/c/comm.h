@@ -8,6 +8,7 @@ typedef struct {
   void (*login_code)(const char *url, const char *code);
   void (*settings_changed)(void);
   void (*send_failed)(void);
+  void (*note)(int32_t key, const char *text);
 } CommHandlers;
 
 void comm_init(CommHandlers handlers);
@@ -16,3 +17,5 @@ void comm_deinit(void);
 // Fordert Daten an: day = 0 -> Cache (heute + morgen), sonst lokale Mitternacht
 // eines einzelnen Tages. false, wenn sofort fehlgeschlagen.
 bool comm_request(time_t day);
+// Fordert die Beschreibung eines Termins an. false, wenn sofort fehlgeschlagen.
+bool comm_request_note(int32_t key);
