@@ -1,7 +1,7 @@
 // PebbleKit JS: sign-in (device code flow), Microsoft Graph, transfer to the watch.
 // No server of our own - tokens stay in the phone's localStorage.
 
-var Clay = require('pebble-clay');
+var Clay = require('@rebble/clay');
 var messageKeys = require('message_keys');
 var lib = require('./lib');
 var i18n = require('./i18n');

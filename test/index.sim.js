@@ -96,7 +96,7 @@ global.XMLHttpRequest.prototype = {
 // Module stubs
 var origLoad = Module._load;
 Module._load = function(request) {
-  if (request === 'pebble-clay') {
+  if (request === '@rebble/clay') {
     var Clay = function(config) { this.config = config; this.meta = { activeWatchInfo: null }; };
     Clay.prototype.generateUrl = function() { return 'data:clay'; };
     Clay.prototype.getSettings = function(r) { return JSON.parse(decodeURIComponent(r)); };

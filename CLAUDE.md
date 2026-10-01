@@ -17,7 +17,7 @@ Pebble watchapp that shows Office 365 calendar events day by day (day view, swip
 - Target device: Pebble Time 2 (`emery`, 200×228, color, touch). Also built for `basalt`, `diorite` and `flint` (Pebble 2 Duo, 144×168, black/white, no touch – like diorite); layout is computed relative to layer bounds, not fixed pixels. Platform-specific sizes only via `PBL_PLATFORM_EMERY` (everything else uses the smaller values).
 - Pebble SDK: C (watch) + PebbleKit JS (phone) + Clay (settings page).
 - Development on Windows → run the Pebble SDK in WSL2 (`uv tool install pebble-tool`, then `pebble sdk install latest`).
-- No heavy JS dependencies besides Clay (`pebble-clay`).
+- No heavy JS dependencies besides Clay (`@rebble/clay`, the maintained successor of `pebble-clay` – the old 1.0.4 does not support `flint`).
 - Write PebbleKit JS in ES5 (no arrow functions, no `let`/`const`, no Promises).
 
 ## Architecture
@@ -107,7 +107,7 @@ The Clay config is built **dynamically** from the cached calendar list when open
 | Move options | Checkbox group: 1 hour / 1 day / 2 days / 1 week later / next Monday (default 1 day + 1 week, bitmask `moveOptions`) |
 | Sign out | Toggle → delete tokens |
 
-Clay fills `meta.activeWatchInfo` only on the `ready` event – for the instance created per opening, `index.js` sets it itself (otherwise the color picker only shows black/white). Do not use `capabilities` in the config (Clay does not know newer platforms).
+Clay fills `meta.activeWatchInfo` only on the `ready` event – for the instance created per opening, `index.js` sets it itself (otherwise the color picker only shows black/white). Do not use `capabilities` in the config (older Clay versions did not know newer platforms).
 
 Settings that concern the watch (briefing on/off, time, weekdays, language, colors, touch, gray past, auto close, move options) are sent via AppMessage (`MSG_TYPE = 5`) and persisted on the watch. JS also sends them at the start of every sync.
 
