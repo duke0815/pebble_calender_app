@@ -114,8 +114,10 @@ bool events_commit(int count, time_t list_day, int list_days) {
     count = limit;
   }
   uint32_t expected = (count <= 0) ? 0 : ((1u << count) - 1);
-  if (count < 0 || list_day == 0 || (s_incoming_mask & expected) != expected) {
-    APP_LOG(APP_LOG_LEVEL_WARNING, "Liste unvollstaendig, verworfen");
+  if (count < 0 || list_day == 0 || (s_incoming_mask & expected) != expected ||
+      (list_days < 2 && list_day != s_view_day)) {
+    // unvollständig, oder verspätete Antwort für einen Tag, der nicht mehr angezeigt wird
+    APP_LOG(APP_LOG_LEVEL_WARNING, "Liste verworfen");
     s_incoming_mask = 0;
     return false;
   }

@@ -112,11 +112,14 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 - Texte für die Uhr kein „…“-Zeichen verwenden, sondern `...` (Font-Abdeckung).
 
 ## Watchapp (C)
-- Statuszeile oben: „Stand HH:MM“, „Aktualisiere...“, „Offline · Stand HH:MM“ oder Fehlertext.
+- **Leiste oben:** immer das Datum des angezeigten Tages („Heute, Do 01.10.“, „Morgen, …“, „Sa 03.10.“). Darunter nur bei Bedarf eine schmale Statuszeile (Section-Header, sonst Höhe 0): „Aktualisiere...“, „Lade Tag...“, „Offline - Stand HH:MM“ oder Fehlertext. Im Normalfall kein „Stand“.
 - `MenuLayer` darunter, eigene Zeilenzeichnung: Uhrzeit-Spanne (bzw. „Ganztägig“), Titel, Ort. Vergangene Termine grau.
-- **Tagesansicht:** immer genau ein Tag (max. 12 Termine), Überschrift „< Heute, Mi 01.10. >“ / „< Morgen, … >“ / „< Fr 03.10. >“. Termine, die vor dem Tag begonnen haben, erscheinen mit.
-- **Touch (nur `PBL_TOUCH`, Pebble Time 2):** eigene Gestenerkennung über `touch_service_subscribe()` (System-Touchnavigation bleibt aus). Wischen links = nächster Tag, rechts = vorheriger Tag, hoch/runter = Auswahl scrollen (1 Zeile pro ~60 px). In der Detailansicht: hoch/runter scrollt, rechts wischen = zurück. Tippen tut nichts. Blätterbereich: −60 bis +90 Tage. Andere Plattformen: keine Tagesnavigation.
-- Tage im Cache (heute/morgen) kommen sofort; andere Tage fordert die Uhr an („Lade Tag...“, Timeout 15 s). Um Mitternacht springt die Ansicht mit, wenn „heute“ angezeigt war.
+- **Tagesansicht:** immer genau ein Tag (max. 12 Termine). Termine, die vor dem Tag begonnen haben, erscheinen mit.
+- **Touch (nur `PBL_TOUCH`, Pebble Time 2):**
+  - Vertikales Scrollen, Tippen und „rechts wischen = zurück“ in der Detailansicht macht die **Touch-Navigation von PebbleOS** (`app_touch_navigation_enable(true)`): Inhalt folgt dem Finger 1:1, mit Schwung; Tippen auf einen Termin öffnet ihn. **Kein eigenes stufenweises Scrollen** (wurde als unangenehm empfunden). Funktioniert nur, wenn die Touch-Navigation in den Uhr-Einstellungen eingeschaltet ist.
+  - Horizontal in der Tagesansicht wertet die App selbst aus (`touch_service_subscribe()`): links = nächster Tag, rechts = vorheriger Tag. Die Touch-Navigation meldet „rechts wischen“ zusätzlich als BACK-Taste → das Hauptfenster hat eine eigene Tastenbelegung (wie MenuLayer) und ignoriert BACK, solange der Finger liegt oder das Abheben < 600 ms her ist; echte Zurück-Taste beendet die App.
+  - Blätterbereich: −60 bis +90 Tage. Andere Plattformen: keine Tagesnavigation.
+- Tage im Cache (heute/morgen) kommen sofort; andere Tage fordert die Uhr an („Lade Tag...“, Timeout 15 s; ist der Sendepuffer belegt, bis zu 8 Versuche im 250-ms-Abstand). Tageslisten werden nur übernommen, wenn sie zum gerade angezeigten Tag gehören (verspätete Antworten werden verworfen). Um Mitternacht springt die Ansicht mit, wenn „heute“ angezeigt war.
 - Keine Aktions-Einträge (kein „Aktualisieren“/„Anmelden“) – bewusst entfernt.
 - Select auf einem Termin → Detailfenster (Datum, Zeit, voller Titel, Ort). Schrift dort bewusst klein: emery Titel GOTHIC_24_BOLD, Zeit GOTHIC_18_BOLD, Rest GOTHIC_18 (andere Plattformen eine Stufe kleiner).
 - Minütlicher Tick → Ansicht neu berechnen (vergangene Termine, Tageswechsel).

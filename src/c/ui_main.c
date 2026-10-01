@@ -35,6 +35,7 @@ static TextLayer *s_status_layer;
 static MenuLayer *s_menu_layer;
 static UiMainCallbacks s_callbacks;
 
+static char s_date_text[32];
 static char s_status_text[64];
 static char s_empty_text[96] = "Lade Termine...";
 
@@ -58,8 +59,9 @@ static uint16_t prv_num_rows(MenuLayer *menu, uint16_t section, void *ctx) {
   return prv_is_info() ? 1 : events_view_count();
 }
 
+// Section-Header = Statuszeile, nur sichtbar, wenn es etwas zu melden gibt
 static int16_t prv_header_height(MenuLayer *menu, uint16_t section, void *ctx) {
-  return HEADER_H;
+  return s_status_text[0] ? HEADER_H : 0;
 }
 
 static int16_t prv_cell_height(MenuLayer *menu, MenuIndex *index, void *ctx) {
@@ -71,21 +73,13 @@ static int16_t prv_cell_height(MenuLayer *menu, MenuIndex *index, void *ctx) {
 }
 
 static void prv_draw_header(GContext *ctx, const Layer *cell, uint16_t section, void *data) {
+  if (!s_status_text[0]) return;
   GRect bounds = layer_get_bounds(cell);
-  char day[24];
-  char text[40];
-  format_day(events_view_day(), day, sizeof(day));
-#if defined(PBL_TOUCH)
-  // Hinweis auf Wischen links/rechts
-  snprintf(text, sizeof(text), "< %s >", day);
-#else
-  snprintf(text, sizeof(text), "%s", day);
-#endif
   graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorLightGray, GColorBlack));
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   graphics_context_set_text_color(ctx, PBL_IF_COLOR_ELSE(GColorBlack, GColorWhite));
-  graphics_draw_text(ctx, text, fonts_get_system_font(FONT_TIME),
-                     GRect(PAD_X, 0, bounds.size.w - 2 * PAD_X, HEADER_H),
+  graphics_draw_text(ctx, s_status_text, fonts_get_system_font(FONT_LOC),
+                     GRect(PAD_X, -2, bounds.size.w - 2 * PAD_X, HEADER_H),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
@@ -144,6 +138,40 @@ static void prv_selection_changed(MenuLayer *menu, MenuIndex new_index, MenuInde
   prv_interaction();
 }
 
+#if defined(PBL_TOUCH)
+// Eigene Tastenbelegung (wie MenuLayer), damit "Zurück" abgefangen werden kann: Die
+// Touch-Navigation meldet Wischen nach rechts als BACK, das soll die App nicht schließen.
+static void prv_click_up(ClickRecognizerRef recognizer, void *context) {
+  prv_interaction();
+  menu_layer_set_selected_next(s_menu_layer, true, MenuRowAlignCenter, true);
+}
+
+static void prv_click_down(ClickRecognizerRef recognizer, void *context) {
+  prv_interaction();
+  menu_layer_set_selected_next(s_menu_layer, false, MenuRowAlignCenter, true);
+}
+
+static void prv_click_select(ClickRecognizerRef recognizer, void *context) {
+  MenuIndex index = menu_layer_get_selected_index(s_menu_layer);
+  prv_select(s_menu_layer, &index, NULL);
+}
+
+static void prv_click_back(ClickRecognizerRef recognizer, void *context) {
+  if (s_callbacks.back) {
+    s_callbacks.back();
+  } else {
+    window_stack_pop(true);
+  }
+}
+
+static void prv_click_config(void *context) {
+  window_single_repeating_click_subscribe(BUTTON_ID_UP, 100, prv_click_up);
+  window_single_repeating_click_subscribe(BUTTON_ID_DOWN, 100, prv_click_down);
+  window_single_click_subscribe(BUTTON_ID_SELECT, prv_click_select);
+  window_single_click_subscribe(BUTTON_ID_BACK, prv_click_back);
+}
+#endif
+
 // ---------------------------------------------------------------------------
 // Fenster
 
@@ -157,7 +185,7 @@ static void prv_window_load(Window *window) {
   text_layer_set_font(s_status_layer, fonts_get_system_font(FONT_TIME));
   text_layer_set_text_alignment(s_status_layer, GTextAlignmentCenter);
   text_layer_set_overflow_mode(s_status_layer, GTextOverflowModeTrailingEllipsis);
-  text_layer_set_text(s_status_layer, s_status_text);
+  text_layer_set_text(s_status_layer, s_date_text);
   layer_add_child(root, text_layer_get_layer(s_status_layer));
 
   s_menu_layer = menu_layer_create(GRect(0, STATUS_H, bounds.size.w, bounds.size.h - STATUS_H));
@@ -172,7 +200,11 @@ static void prv_window_load(Window *window) {
     .selection_changed = prv_selection_changed,
   });
   menu_layer_set_highlight_colors(s_menu_layer, COLOR_ACCENT, GColorWhite);
+#if defined(PBL_TOUCH)
+  window_set_click_config_provider(window, prv_click_config);
+#else
   menu_layer_set_click_config_onto_window(s_menu_layer, window);
+#endif
   layer_add_child(root, menu_layer_get_layer(s_menu_layer));
 }
 
@@ -196,6 +228,7 @@ void ui_main_push(UiMainCallbacks callbacks) {
     .unload = prv_window_unload,
   });
   events_rebuild_view();
+  format_day(events_view_day(), s_date_text, sizeof(s_date_text));
   window_stack_push(s_window, true);
 }
 
@@ -206,8 +239,16 @@ void ui_main_destroy(void) {
   }
 }
 
+static void prv_update_date(void) {
+  format_day(events_view_day(), s_date_text, sizeof(s_date_text));
+  if (s_status_layer) {
+    layer_mark_dirty(text_layer_get_layer(s_status_layer));
+  }
+}
+
 void ui_main_reload(bool select_upcoming) {
   events_rebuild_view();
+  prv_update_date();
   if (!s_menu_layer) return;
   menu_layer_reload_data(s_menu_layer);
   MenuIndex current = menu_layer_get_selected_index(s_menu_layer);
@@ -223,24 +264,16 @@ bool ui_main_is_top(void) {
   return s_window && window_stack_get_top_window() == s_window;
 }
 
-void ui_main_scroll(int rows) {
-  if (!s_menu_layer || rows == 0) return;
-  prv_interaction();
-  bool up = rows < 0;
-  int steps = up ? -rows : rows;
-  for (int i = 0; i < steps; i++) {
-    menu_layer_set_selected_next(s_menu_layer, up, MenuRowAlignCenter, i == steps - 1);
-  }
-}
-
 void ui_main_set_status(const char *status, const char *empty_text) {
+  bool had_status = s_status_text[0] != '\0';
   strncpy(s_status_text, status, sizeof(s_status_text) - 1);
   s_status_text[sizeof(s_status_text) - 1] = '\0';
+  if (s_menu_layer && had_status != (s_status_text[0] != '\0')) {
+    menu_layer_reload_data(s_menu_layer);  // Statuszeile ein-/ausblenden ändert die Header-Höhe
+  }
   strncpy(s_empty_text, empty_text, sizeof(s_empty_text) - 1);
   s_empty_text[sizeof(s_empty_text) - 1] = '\0';
-  if (s_status_layer) {
-    layer_mark_dirty(text_layer_get_layer(s_status_layer));
-  }
+  prv_update_date();
   if (s_menu_layer) {
     layer_mark_dirty(menu_layer_get_layer(s_menu_layer));
   }

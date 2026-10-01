@@ -17,9 +17,9 @@
 #define MIN_DAY_OFFSET -60
 #define MAX_DAY_OFFSET 90
 
-// Wischgesten (Pixel)
-#define SWIPE_MIN_PX  30
-#define SWIPE_ROW_PX  60
+// Wischgesten: Mindestweg (Pixel), Zeitfenster für die vom System erzeugte BACK-Taste (ms)
+#define SWIPE_MIN_PX        30
+#define TOUCH_BACK_WINDOW_MS 600
 
 typedef enum {
   STATE_IDLE,      // Daten aktuell (oder noch nie synchronisiert)
@@ -74,11 +74,7 @@ static void prv_update_status(void) {
       snprintf(status, sizeof(status), "%s", s_error);
       break;
     default:
-      if (last) {
-        snprintf(status, sizeof(status), "Stand %s", stamp);
-      } else {
-        status[0] = '\0';
-      }
+      status[0] = '\0';  // Normalfall: keine Statuszeile, oben steht nur das Datum
   }
 
   bool today = events_view_day() == time_day_start(time(NULL));
@@ -143,17 +139,34 @@ static void prv_request_refresh(void) {
 // ---------------------------------------------------------------------------
 // Tage blättern
 
+static AppTimer *s_day_send_timer;
+static int s_day_send_tries;
+
 static void prv_day_done(void) {
   s_day_loading = false;
   if (s_day_timer) {
     app_timer_cancel(s_day_timer);
     s_day_timer = NULL;
   }
+  if (s_day_send_timer) {
+    app_timer_cancel(s_day_send_timer);
+    s_day_send_timer = NULL;
+  }
+}
+
+// Anfrage senden; ist der Sendepuffer noch belegt (schnelles Wischen), kurz später erneut.
+static void prv_day_send(void *data) {
+  s_day_send_timer = NULL;
+  if (!s_day_loading) return;
+  if (comm_request(s_requested_day)) return;
+  if (++s_day_send_tries < 8) {
+    s_day_send_timer = app_timer_register(250, prv_day_send, NULL);
+  }
 }
 
 static void prv_day_timeout(void *data) {
   s_day_timer = NULL;
-  s_day_loading = false;
+  prv_day_done();
   prv_update_status();
   ui_main_reload(false);
 }
@@ -167,12 +180,12 @@ static void prv_change_day(int delta) {
   }
   events_set_view_day(day);
   prv_day_done();
-  if (!events_view_available()) {
-    if (connection_service_peek_pebble_app_connection() && comm_request(day)) {
-      s_day_loading = true;
-      s_requested_day = day;
-      s_day_timer = app_timer_register(DAY_TIMEOUT_MS, prv_day_timeout, NULL);
-    }
+  if (!events_view_available() && connection_service_peek_pebble_app_connection()) {
+    s_day_loading = true;
+    s_requested_day = day;
+    s_day_send_tries = 0;
+    s_day_timer = app_timer_register(DAY_TIMEOUT_MS, prv_day_timeout, NULL);
+    prv_day_send(NULL);
   }
   prv_update_status();
   ui_main_reload(true);
@@ -208,9 +221,7 @@ static void prv_list_updated(bool complete, time_t list_day, int list_days) {
       prv_day_done();
     }
     prv_update_status();
-    if (list_day == events_view_day()) {
-      ui_main_reload(true);
-    }
+    ui_main_reload(list_day == events_view_day());
     return;
   }
   prv_cancel_sync_timer();
@@ -270,14 +281,27 @@ static void prv_send_failed(void) {
 // ---------------------------------------------------------------------------
 // Touch (Pebble Time 2): links/rechts = Tag wechseln, hoch/runter = scrollen
 
+// Vertikales Scrollen (flüssig, mit Schwung), Tippen = Termin öffnen und Wischen nach rechts in
+// der Detailansicht übernimmt die Touch-Navigation von PebbleOS (app_touch_navigation_enable).
+// Selbst ausgewertet wird nur das horizontale Wischen in der Tagesansicht.
 #if defined(PBL_TOUCH)
 static bool s_touch_active;
+static bool s_finger_down;
 static int16_t s_touch_x;
 static int16_t s_touch_y;
+static uint32_t s_last_liftoff_ms;
+
+static uint32_t prv_now_ms(void) {
+  time_t sec;
+  uint16_t ms;
+  time_ms(&sec, &ms);
+  return (uint32_t)sec * 1000 + ms;
+}
 
 static void prv_touch_handler(const TouchEvent *event, void *context) {
   switch (event->type) {
     case TouchEvent_Touchdown:
+      s_finger_down = true;
       s_touch_active = !event->non_navigational;
       s_touch_x = event->x;
       s_touch_y = event->y;
@@ -285,6 +309,8 @@ static void prv_touch_handler(const TouchEvent *event, void *context) {
     case TouchEvent_PositionUpdate:
       return;
     case TouchEvent_Liftoff:
+      s_finger_down = false;
+      s_last_liftoff_ms = prv_now_ms();
       break;
     default:
       return;
@@ -296,31 +322,28 @@ static void prv_touch_handler(const TouchEvent *event, void *context) {
   int dy = event->y - s_touch_y;
   int adx = dx < 0 ? -dx : dx;
   int ady = dy < 0 ? -dy : dy;
-  if (adx < SWIPE_MIN_PX && ady < SWIPE_MIN_PX) {
-    return;  // Tippen: keine Aktion
-  }
   prv_interaction();
+  if (adx < SWIPE_MIN_PX || adx <= ady || !ui_main_is_top()) {
+    return;  // Tippen/vertikal: macht das System; Detail-/Login-Fenster: nichts
+  }
+  prv_change_day(dx < 0 ? 1 : -1);  // nach links wischen = nächster Tag
+}
 
-  if (ui_detail_is_open()) {
-    if (adx > ady) {
-      if (dx > 0) ui_detail_close();  // nach rechts wischen = zurück
-    } else {
-      ui_detail_scroll(-dy);          // Finger nach oben = weiterlesen
-    }
-    return;
-  }
-  if (!ui_main_is_top()) {
-    return;  // z. B. Login-Fenster
-  }
-  if (adx > ady) {
-    prv_change_day(dx < 0 ? 1 : -1);  // nach links wischen = nächster Tag
-  } else {
-    int rows = ady / SWIPE_ROW_PX;
-    if (rows < 1) rows = 1;
-    ui_main_scroll(dy < 0 ? rows : -rows);  // Finger nach oben = weiter nach unten
-  }
+// Die Touch-Navigation meldet "nach rechts wischen" als BACK-Taste. In der Tagesansicht
+// heißt das "vorheriger Tag" (macht prv_touch_handler) – nur echte Tastendrücke beenden die App.
+static bool prv_back_is_from_touch(void) {
+  return s_finger_down || (prv_now_ms() - s_last_liftoff_ms) < TOUCH_BACK_WINDOW_MS;
 }
 #endif
+
+static void prv_back(void) {
+#if defined(PBL_TOUCH)
+  if (prv_back_is_from_touch()) {
+    return;
+  }
+#endif
+  window_stack_pop_all(true);
+}
 
 // ---------------------------------------------------------------------------
 // Wakeup & Tick
@@ -381,12 +404,14 @@ static void prv_init(void) {
 
   ui_main_push((UiMainCallbacks) {
     .interaction = prv_interaction,
+    .back = prv_back,
   });
   ui_main_reload(true);
 
   wakeup_service_subscribe(prv_wakeup_handler);
 #if defined(PBL_TOUCH)
   touch_service_subscribe(prv_touch_handler, NULL);
+  app_touch_navigation_enable(true);
 #endif
   tick_timer_service_subscribe(MINUTE_UNIT, prv_tick);
 

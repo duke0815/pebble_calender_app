@@ -59,6 +59,15 @@ Layer *window_get_root_layer(const Window *window);
 void window_stack_push(Window *window, bool animated);
 bool window_stack_remove(Window *window, bool animated);
 Window *window_stack_get_top_window(void);
+Window *window_stack_pop(bool animated);
+
+typedef enum { BUTTON_ID_BACK = 0, BUTTON_ID_UP, BUTTON_ID_SELECT, BUTTON_ID_DOWN, NUM_BUTTONS } ButtonId;
+typedef void *ClickRecognizerRef;
+typedef void (*ClickHandler)(ClickRecognizerRef recognizer, void *context);
+typedef void (*ClickConfigProvider)(void *context);
+void window_set_click_config_provider(Window *window, ClickConfigProvider click_config_provider);
+void window_single_click_subscribe(ButtonId button_id, ClickHandler handler);
+void window_single_repeating_click_subscribe(ButtonId button_id, uint16_t repeat_interval_ms, ClickHandler handler);
 void window_stack_pop_all(const bool animated);
 
 GRect layer_get_bounds(const Layer *layer);
@@ -194,6 +203,7 @@ void app_touch_navigation_enable(bool enable);
 #endif
 bool connection_service_peek_pebble_app_connection(void);
 bool clock_is_24h_style(void);
+uint16_t time_ms(time_t *t_utc, uint16_t *out_ms);
 void app_event_loop(void);
 
 typedef enum { APP_LOG_LEVEL_ERROR = 1, APP_LOG_LEVEL_WARNING = 50, APP_LOG_LEVEL_INFO = 100, APP_LOG_LEVEL_DEBUG = 200 } AppLogLevel;

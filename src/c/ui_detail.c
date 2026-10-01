@@ -105,10 +105,3 @@ void ui_detail_close(void) {
     window_stack_remove(s_window, true);
   }
 }
-
-void ui_detail_scroll(int dy) {
-  if (!s_scroll) return;
-  GPoint offset = scroll_layer_get_content_offset(s_scroll);
-  offset.y -= dy;  // Offset ist negativ, je weiter unten gelesen wird
-  scroll_layer_set_content_offset(s_scroll, offset, true);
-}

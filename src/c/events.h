@@ -18,7 +18,8 @@ time_t events_last_sync(void);
 void events_receive(int index, const CalEvent *event);
 // Übernimmt die empfangene Liste, wenn vollständig. list_day = lokale Mitternacht des
 // ersten Tages, list_days = Anzahl Tage. Listen mit >= 2 Tagen ersetzen den Cache,
-// 1-Tages-Listen landen im Tagespuffer (nur RAM). Gibt true zurück, wenn übernommen.
+// 1-Tages-Listen landen im Tagespuffer (nur RAM) – aber nur für den gerade angezeigten Tag.
+// Gibt true zurück, wenn übernommen.
 bool events_commit(int count, time_t list_day, int list_days);
 
 // Ansicht: genau ein Tag

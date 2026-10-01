@@ -108,11 +108,18 @@ int main(void) {
   assert(events_view_count() == 3);
 
   // Max. 12 Termine pro Tag in der Ansicht
-  for (int i = 0; i < 14; i++) add(i, local(2026, 10, 5, 8, i), local(2026, 10, 5, 9, i), 0, "X");
   time_t day5 = local(2026, 10, 5, 0, 0);
-  assert(events_commit(14, day5, 1));          // auf MAX_DAY_EVENTS gekürzt
   events_set_view_day(day5);
+  for (int i = 0; i < 14; i++) add(i, local(2026, 10, 5, 8, i), local(2026, 10, 5, 9, i), 0, "X");
+  assert(events_commit(14, day5, 1));          // auf MAX_DAY_EVENTS gekürzt
+  events_rebuild_view();
   assert(events_view_count() == MAX_DAY_EVENTS);
+
+  // Verspätete Antwort für einen anderen Tag wird verworfen, Anzeige bleibt
+  add(0, local(2026, 10, 4, 9, 0), local(2026, 10, 4, 10, 0), 0, "Zu spaet");
+  assert(!events_commit(1, local(2026, 10, 4, 0, 0), 1));
+  events_rebuild_view();
+  assert(events_view_count() == MAX_DAY_EVENTS && strcmp(events_view_get(0)->title, "X") == 0);
 
   // Cache neu laden
   events_load_cache();
