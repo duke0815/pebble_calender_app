@@ -51,7 +51,8 @@
       "SET_COLOR_BG",
       "EVT_KEY",
       "NOTE_TEXT",
-      "SET_TOUCH"
+      "SET_TOUCH",
+      "SET_GRAY_PAST"
     ],
     "resources": {
       "media": [

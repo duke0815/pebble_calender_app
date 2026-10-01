@@ -202,6 +202,8 @@ test('Clay: Farben und Sprache', function() {
   assert.strictEqual(bad.settings.language, 'auto');
   assert.strictEqual(bad.settings.bgColor, 0xFFFFFF);
   assert.strictEqual(settings.touch, true);
+  assert.strictEqual(settings.grayPast, false);
+  assert.strictEqual(config.applyResult({ CFG_GRAY_PAST: { value: true } }, [], settings).settings.grayPast, true);
   assert.strictEqual(config.applyResult({ CFG_TOUCH: { value: false } }, [], settings).settings.touch, false);
 });
 

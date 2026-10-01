@@ -86,6 +86,12 @@ function buildConfig(calendars, settings, loggedIn) {
           messageKey: 'CFG_HIDE_DECLINED',
           label: t('cfgHideDeclined'),
           defaultValue: settings.hideDeclined
+        },
+        {
+          type: 'toggle',
+          messageKey: 'CFG_GRAY_PAST',
+          label: t('cfgGrayPast'),
+          defaultValue: settings.grayPast
         }
       ]
     },
@@ -171,6 +177,7 @@ function applyResult(result, calendars, settings) {
   }
   next.showAllDay = !!value(result, 'CFG_ALLDAY', next.showAllDay);
   next.touch = !!value(result, 'CFG_TOUCH', next.touch);
+  next.grayPast = !!value(result, 'CFG_GRAY_PAST', next.grayPast);
   next.hideDeclined = !!value(result, 'CFG_HIDE_DECLINED', next.hideDeclined);
   next.briefEnabled = !!value(result, 'CFG_BRIEF', next.briefEnabled);
   var t = lib.parseTime(value(result, 'CFG_BRIEF_TIME', next.briefTime));

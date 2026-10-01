@@ -4,6 +4,7 @@
 #include "format.h"
 #include "i18n.h"
 #include "theme.h"
+#include "settings.h"
 
 #if defined(PBL_PLATFORM_EMERY)
   #define FONT_TIME   FONT_KEY_GOTHIC_18_BOLD
@@ -102,7 +103,7 @@ static void prv_draw_header(GContext *ctx, const Layer *cell, uint16_t section, 
 static void prv_draw_event(GContext *ctx, const Layer *cell, const CalEvent *e) {
   GRect bounds = layer_get_bounds(cell);
   bool highlighted = s_selection_visible && menu_cell_layer_is_highlighted(cell);
-  bool past = e->end <= time(NULL);
+  bool past = settings_get()->gray_past && e->end <= time(NULL);
 
   GRect card = GRect(CARD_MARGIN, CARD_GAP / 2, bounds.size.w - 2 * CARD_MARGIN,
                      bounds.size.h - CARD_GAP);

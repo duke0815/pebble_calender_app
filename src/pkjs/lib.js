@@ -44,6 +44,7 @@ var DEFAULT_SETTINGS = {
   briefDays: 62,              // Bitmaske, Bit 0 = Sonntag; Mo-Fr
   language: 'auto',           // 'auto' | 'de' | 'en'
   touch: true,                // Touch-Bedienung auf der Uhr (Pebble Time 2)
+  grayPast: false,            // vergangene Termine grau anzeigen
   accentColor: 0x0055AA,      // 0xRRGGBB (Pebble-Palette)
   textColor: 0x000000,
   bgColor: 0xFFFFFF

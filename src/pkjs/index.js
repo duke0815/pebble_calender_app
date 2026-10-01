@@ -108,6 +108,7 @@ function sendSettings(settings) {
     SET_BRIEF_DAYS: settings.briefDays,
     SET_LANG: i18n.getLang() === 'en' ? 1 : 0,
     SET_TOUCH: settings.touch ? 1 : 0,
+    SET_GRAY_PAST: settings.grayPast ? 1 : 0,
     SET_COLOR_ACCENT: settings.accentColor,
     SET_COLOR_TEXT: settings.textColor,
     SET_COLOR_BG: settings.bgColor

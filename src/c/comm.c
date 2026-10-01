@@ -52,6 +52,7 @@ static void prv_handle_settings(DictionaryIterator *iter) {
   s->brief_days = prv_int(iter, MESSAGE_KEY_SET_BRIEF_DAYS, s->brief_days) & 0x7F;
   s->lang = prv_int(iter, MESSAGE_KEY_SET_LANG, s->lang) == LANG_EN ? LANG_EN : LANG_DE;
   s->touch_off = prv_int(iter, MESSAGE_KEY_SET_TOUCH, !s->touch_off) ? 0 : 1;
+  s->gray_past = prv_int(iter, MESSAGE_KEY_SET_GRAY_PAST, s->gray_past) ? 1 : 0;
   s->color_accent = (uint32_t)prv_int(iter, MESSAGE_KEY_SET_COLOR_ACCENT, s->color_accent) & 0xFFFFFF;
   s->color_text = (uint32_t)prv_int(iter, MESSAGE_KEY_SET_COLOR_TEXT, s->color_text) & 0xFFFFFF;
   s->color_bg = (uint32_t)prv_int(iter, MESSAGE_KEY_SET_COLOR_BG, s->color_bg) & 0xFFFFFF;

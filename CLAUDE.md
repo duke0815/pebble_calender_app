@@ -81,6 +81,7 @@ Clay-Config wird beim Öffnen (`showConfiguration`) **dynamisch** aus der gecach
 | Kalender | Checkbox-Gruppe (Default: Standardkalender) |
 | Ganztägige Termine anzeigen | Toggle (Default an) |
 | Abgelehnte Termine ausblenden | Toggle (Default an) |
+| Vergangene Termine ausgrauen | Toggle (Default **aus** = alle Termine gleiche Farbe) |
 | Touch-Bedienung | Toggle (Default an); aus = kein Wischen/Tippen, Tageswechsel nur per Tasten |
 | Sprache | Auswahl: Automatisch (wie Handy, `navigator.language`) / Deutsch / English |
 | Akzentfarbe | Farbwähler (Default `0055AA` Kobaltblau): Datumsleiste + ausgewählter Termin |
@@ -117,6 +118,7 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 | `SET_BRIEF_HOUR` / `SET_BRIEF_MINUTE` | int | Briefing-Uhrzeit |
 | `SET_BRIEF_DAYS` | int | Bitmaske, Bit 0 = Sonntag … Bit 6 = Samstag (wie `tm_wday`); Mo–Fr = 62 |
 | `SET_LANG` | int | 0 = Deutsch, 1 = Englisch (in JS aus „Automatisch“ aufgelöst) |
+| `SET_GRAY_PAST` | int | 1 = vergangene Termine grau, 0 = alle gleich (Default) |
 | `SET_TOUCH` | int | 1 = Touch-Bedienung an, 0 = aus (Uhr speichert invertiert als `touch_off`, damit alte Settings „an“ bedeuten) |
 | `SET_COLOR_ACCENT` / `SET_COLOR_TEXT` / `SET_COLOR_BG` | int | 0xRRGGBB, auf der Uhr per `GColorFromHEX()` |
 
@@ -131,7 +133,7 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 
 ## Watchapp (C)
 - **Leiste oben:** immer das Datum des angezeigten Tages („Heute, Do 01.10.“, „Morgen, …“, „Sa 03.10.“). Darunter nur bei Bedarf eine schmale Statuszeile (Section-Header, sonst Höhe 0): „Aktualisiere...“, „Lade Tag...“, „Offline - Stand HH:MM“ oder Fehlertext. Im Normalfall kein „Stand“.
-- `MenuLayer` darunter, eigene Zeilenzeichnung: jeder Termin als **Kasten mit Rahmen** (Farbe = Schriftfarbe, vergangene grau, Radius 4) und ~0,5 mm Luft dazwischen (`CARD_GAP` 4 px auf emery, 3 px sonst); Inhalt: Uhrzeit-Spanne (bzw. „Ganztägig“), Titel, Ort.
+- `MenuLayer` darunter, eigene Zeilenzeichnung: jeder Termin als **Kasten mit Rahmen** (Farbe = Schriftfarbe, Radius 4; vergangene nur grau, wenn „Vergangene Termine ausgrauen“ an ist) und ~0,5 mm Luft dazwischen (`CARD_GAP` 4 px auf emery, 3 px sonst); Inhalt: Uhrzeit-Spanne (bzw. „Ganztägig“), Titel, Ort.
 - **Keine Auswahl von Anfang an:** Erst der erste Tastendruck (hoch/runter/Select) blendet die Auswahl ein (gefüllter Kasten in Akzentfarbe), ohne sie zu bewegen. Beim Tageswechsel wieder aus. Die MenuLayer-Highlight-Farben sind deshalb = Normalfarben; die Hervorhebung zeichnet `prv_draw_event` selbst.
 - **Tasten (alle Plattformen, eigene Click-Config):** hoch/runter = Auswahl, **lang drücken (400 ms) = vorheriger/nächster Tag**, Select = Details, Zurück = App beenden.
 - **Tagesansicht:** immer genau ein Tag (max. 12 Termine). Termine, die vor dem Tag begonnen haben, erscheinen mit.
