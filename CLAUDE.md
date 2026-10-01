@@ -37,7 +37,7 @@ src/c/theme.c/.h     Farben aus den Settings + abgeleitete Kontrastfarben
 src/pkjs/i18n.js     Texte für Statusmeldungen und Einstellungsseite (Deutsch/Englisch)
 test/lib.test.js     Node-Tests für lib.js + config.js
 test/index.sim.js    Simulation von index.js (Pebble/XHR/localStorage gemockt)
-test/c/run.sh        C-Kompilierung (-O2 -Werror) gegen Stub-pebble.h (emery/basalt/diorite) + native Logiktests
+test/c/run.sh        C-Kompilierung mit SDK-Flags (-std=c99 -Os -Werror, -fshort-enums wie ARM) gegen Stub-pebble.h + native Logiktests
 ```
 
 Vor jedem Commit: `TZ=Europe/Vienna node test/lib.test.js && TZ=Europe/Vienna node test/index.sim.js && sh test/c/run.sh`. Der Stub (`test/c/stub/pebble.h`) muss bei neuen SDK-Aufrufen ergänzt werden – mit den echten Signaturen.

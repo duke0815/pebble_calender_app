@@ -64,7 +64,7 @@ static int prv_lang(void) {
 }
 
 const char *tr(StrId id) {
-  return (id >= 0 && id < STR_COUNT) ? STRINGS[prv_lang()][id] : "";
+  return ((unsigned)id < STR_COUNT) ? STRINGS[prv_lang()][id] : "";
 }
 
 const char *tr_weekday(int wday) {
