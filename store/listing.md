@@ -1,42 +1,62 @@
 # Store listing – Calendar for Office 365
 
-## Name
+Texts to copy into the Pebble developer portal. The description is plain text (no Markdown).
+
+## App name
 Calendar for Office 365
 
 ## Category
-Tools & Utilities (Productivity)
+Tools & Utilities
 
-## Short description (one line)
-Your Microsoft 365 / Outlook calendar on your wrist – day by day, with a morning briefing.
+## Version / release notes (1.0.0)
+First release.
+- Day view with swipe (Pebble Time 2) or long-press to change the day
+- Event details with the Outlook description
+- Today and tomorrow available offline
+- Optional daily briefing
+- Optional: move your own events from the watch
+- Custom colors, English and German
 
 ## Description
 
-See your Microsoft 365 and Outlook.com calendar on your Pebble.
+Your Microsoft 365 and Outlook.com calendar on your wrist.
 
-**Day view.** All events of a day as clear cards. Swipe left and right to change the day (or long-press the buttons), scroll smoothly, tap to see details including the Outlook description.
+DAY VIEW
+See all events of a day as clear cards with time, title and location. Swipe left and right to change the day on Pebble Time 2, or long-press up/down on any Pebble. Open an event to see its details, including the description from Outlook.
 
-**Works offline.** Today and tomorrow are stored on the watch, so your schedule is there even without your phone.
+WORKS OFFLINE
+Today and tomorrow are stored on the watch, so your schedule is there even when your phone is not.
 
-**Daily briefing.** Optionally the app opens at a time you choose, vibrates and shows your day – on the weekdays you pick.
+DAILY BRIEFING
+Optional: the app opens at a time you choose, vibrates gently and shows your day. Pick the weekdays you want.
 
-**Move events.** Optionally postpone your own events right from the watch: 1 hour, 1 day, 2 days, 1 week later or next Monday.
+MOVE EVENTS
+Optional: postpone your own events right from the watch – 1 hour, 1 day, 2 days, 1 week later or to next Monday. Turned off by default.
 
-**Your way.** Choose calendars, colors, language (English/German), touch control and whether past events are grayed out.
+MAKE IT YOURS
+Choose which calendars to show, accent, text and background colors, English or German, touch control, and whether past events are grayed out. The app closes itself after a few minutes without use to save battery.
 
-**Private by design.** No server, no tracking. Your calendar goes straight from Microsoft to your phone and watch. The developer never sees your data.
+PRIVATE BY DESIGN
+No server, no tracking, no ads. Your calendar goes straight from Microsoft to your phone and your watch. The developer never sees your data or your sign-in.
 
-**Signing in:** open the app, then enter the code shown on the watch at microsoft.com/devicelogin. Keep the app open until your events appear. Microsoft may label the app as "unverified" – that is normal for independent apps.
+SIGNING IN
+Open the app on the watch. It shows a short code – enter it at microsoft.com/devicelogin on your phone or computer and sign in. Keep the app open until your events appear. Microsoft may show the app as "unverified"; this is normal for apps from independent developers.
 
-**Works with:** personal Microsoft accounts (outlook.com, hotmail.com, live.com) and most small organizations. Many larger companies block third-party apps or this sign-in method – in that case the app cannot be used with your work account.
+WHICH ACCOUNTS WORK
+Personal Microsoft accounts (outlook.com, hotmail.com, live.com) work. Work or school accounts usually work in small organizations. Many larger companies block third-party calendar apps or this sign-in method – then the app cannot be used with that account.
 
-Optimized for Pebble Time 2, also runs on Pebble 2 Duo, Pebble Time, Pebble Time Steel and Pebble 2.
+Made for Pebble Time 2. Also runs on Pebble 2 Duo, Pebble Time, Pebble Time Steel and Pebble 2.
 
-Not affiliated with or endorsed by Microsoft. Office 365, Microsoft 365 and Outlook are trademarks of Microsoft Corporation.
+Not affiliated with or endorsed by Microsoft. Microsoft 365, Office 365 and Outlook are trademarks of the Microsoft group of companies.
+
+## Short description (if the portal asks for one)
+Your Microsoft 365 / Outlook calendar on your Pebble – day view, offline, daily briefing. No server, no tracking.
 
 ## Links
-- Help: docs/help.md
-- Privacy policy: docs/privacy.md
-- Source: https://github.com/duke0815/pebble_calender_app
+- Support / contact: _to be decided (public address, not a private mail)_
+- Privacy policy: _public URL to be decided_ (text: `docs/privacy.md`)
+- Help: _public URL to be decided_ (text: `docs/help.md`)
+- Source: the repository is private – leave empty
 
 ## Screenshots
 In `store/screenshots/` (`<platform>-<n>-<name>.png`), generated automatically with `sh tools/screenshots.sh` (demo mode with neutral English sample data). Per platform (emery, basalt, diorite, flint):
