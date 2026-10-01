@@ -45,7 +45,7 @@ function buildConfig(calendars, settings, loggedIn) {
   }
 
   return [
-    { type: 'heading', defaultValue: 'O365 Kalender' },
+    { type: 'heading', defaultValue: 'Kalender für Office 365' },
     {
       type: 'section',
       items: [

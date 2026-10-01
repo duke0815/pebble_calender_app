@@ -1,4 +1,4 @@
-# CLAUDE.md – Pebble-Kalender-App (Office 365)
+# CLAUDE.md – Kalender für Office 365 (Pebble-App)
 
 ## Projektziel
 Pebble-Watchapp, die Office-365-Kalendertermine tageweise anzeigt (Tagesansicht, per Wischen blättern) und optional jeden Tag zu einer festen Uhrzeit ein Termin-Briefing auf der Uhr zeigt.
@@ -216,5 +216,5 @@ Stand: Vom Projektinhaber mit dem echten SDK gebaut und **auf der Pebble Time 2 
 - Store-Beschreibung: klarer Hinweis auf die Einschränkungen bei Firmenkonten (s. o.).
 - Datenschutzhinweis: keine Datenverarbeitung durch den Entwickler, alles bleibt am Gerät.
 
-## Offene Punkte
-- App-Name (Arbeitstitel: „O365 Kalender“)
+## App-Name
+- **„Kalender für Office 365“** (`displayName` in `package.json`, Überschrift der Einstellungsseite, README). „Office 365“ ist eine Microsoft-Marke – im Store-Text klar als „für“ formulieren (kein offizielles Microsoft-Produkt).

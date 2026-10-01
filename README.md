@@ -1,4 +1,4 @@
-# O365 Kalender für Pebble
+# Kalender für Office 365 (Pebble)
 
 Pebble-Watchapp (Ziel: Pebble Time 2), die Termine aus deinem Microsoft-365-/Outlook-Kalender tageweise anzeigt und optional jeden Morgen ein Termin-Briefing auf der Uhr zeigt. Kein eigener Server: Microsoft Graph → Handy (PebbleKit JS) → Uhr.
 
