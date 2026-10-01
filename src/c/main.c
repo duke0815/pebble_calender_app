@@ -192,6 +192,7 @@ static void prv_change_day(int delta) {
   }
   prv_update_status();
   ui_main_reload(true);
+  ui_main_animate_day(delta);
 }
 #endif
 

@@ -14,6 +14,8 @@ void ui_main_destroy(void);
 // Ansicht neu berechnen; optional Auswahl auf den nächsten anstehenden Termin setzen.
 void ui_main_reload(bool select_upcoming);
 
+// Liste beim Tageswechsel von der Seite hereingleiten lassen (delta > 0: von rechts)
+void ui_main_animate_day(int delta);
 // true, wenn das Hauptfenster oben liegt (kein Detail-/Login-Fenster darüber)
 bool ui_main_is_top(void);
 

@@ -23,6 +23,8 @@
   #define STATUS_H    20
 #endif
 
+#define DAY_ANIM_MS  220
+
 #define PAD_X        6
 #define PAD_Y        2
 #define HEADER_H     (H_TIME + 4)
@@ -33,6 +35,8 @@ static Window *s_window;
 static TextLayer *s_status_layer;
 static MenuLayer *s_menu_layer;
 static UiMainCallbacks s_callbacks;
+static PropertyAnimation *s_day_anim;
+static GRect s_menu_frame;
 
 static char s_date_text[32];
 static char s_status_text[64];
@@ -185,7 +189,8 @@ static void prv_window_load(Window *window) {
   text_layer_set_text(s_status_layer, s_date_text);
   layer_add_child(root, text_layer_get_layer(s_status_layer));
 
-  s_menu_layer = menu_layer_create(GRect(0, STATUS_H, bounds.size.w, bounds.size.h - STATUS_H));
+  s_menu_frame = GRect(0, STATUS_H, bounds.size.w, bounds.size.h - STATUS_H);
+  s_menu_layer = menu_layer_create(s_menu_frame);
   menu_layer_set_callbacks(s_menu_layer, NULL, (MenuLayerCallbacks) {
     .get_num_sections = prv_num_sections,
     .get_num_rows = prv_num_rows,
@@ -209,7 +214,16 @@ static void prv_window_appear(Window *window) {
   prv_interaction();
 }
 
+static void prv_stop_day_anim(void) {
+  if (s_day_anim) {
+    // Unschedule beendet und zerstört die Animation; der Stopped-Handler setzt s_day_anim zurück
+    animation_unschedule(property_animation_get_animation(s_day_anim));
+    s_day_anim = NULL;
+  }
+}
+
 static void prv_window_unload(Window *window) {
+  prv_stop_day_anim();
   menu_layer_destroy(s_menu_layer);
   text_layer_destroy(s_status_layer);
   s_menu_layer = NULL;
@@ -256,6 +270,35 @@ static void prv_update_date(void) {
   if (s_status_layer) {
     layer_mark_dirty(text_layer_get_layer(s_status_layer));
   }
+}
+
+static void prv_day_anim_stopped(Animation *animation, bool finished, void *context) {
+  if (s_day_anim && property_animation_get_animation(s_day_anim) == animation) {
+    s_day_anim = NULL;
+  }
+  if (s_menu_layer) {
+    layer_set_frame(menu_layer_get_layer(s_menu_layer), s_menu_frame);
+  }
+}
+
+void ui_main_animate_day(int delta) {
+  if (!s_menu_layer || delta == 0) return;
+  prv_stop_day_anim();
+  GRect to = s_menu_frame;
+  GRect from = s_menu_frame;
+  // Nächster Tag kommt von rechts, vorheriger von links
+  from.origin.x = (delta > 0 ? 1 : -1) * s_menu_frame.size.w / 2;
+  layer_set_frame(menu_layer_get_layer(s_menu_layer), from);
+  s_day_anim = property_animation_create_layer_frame(menu_layer_get_layer(s_menu_layer), &from, &to);
+  if (!s_day_anim) {
+    layer_set_frame(menu_layer_get_layer(s_menu_layer), to);
+    return;
+  }
+  Animation *anim = property_animation_get_animation(s_day_anim);
+  animation_set_duration(anim, DAY_ANIM_MS);
+  animation_set_curve(anim, AnimationCurveEaseOut);
+  animation_set_handlers(anim, (AnimationHandlers) { .stopped = prv_day_anim_stopped }, NULL);
+  animation_schedule(anim);
 }
 
 void ui_main_reload(bool select_upcoming) {

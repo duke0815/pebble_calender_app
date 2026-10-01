@@ -78,6 +78,20 @@ void layer_add_child(Layer *parent, Layer *child);
 void layer_mark_dirty(Layer *layer);
 void layer_set_frame(Layer *layer, GRect frame);
 
+typedef struct Animation Animation;
+typedef struct PropertyAnimation PropertyAnimation;
+typedef enum { AnimationCurveLinear = 0, AnimationCurveEaseIn = 1, AnimationCurveEaseOut = 2, AnimationCurveEaseInOut = 3 } AnimationCurve;
+typedef void (*AnimationStartedHandler)(Animation *animation, void *context);
+typedef void (*AnimationStoppedHandler)(Animation *animation, bool finished, void *context);
+typedef struct { AnimationStartedHandler started; AnimationStoppedHandler stopped; } AnimationHandlers;
+PropertyAnimation *property_animation_create_layer_frame(Layer *layer, GRect *from_frame, GRect *to_frame);
+Animation *property_animation_get_animation(PropertyAnimation *property_animation);
+bool animation_set_duration(Animation *animation, uint32_t duration_ms);
+bool animation_set_curve(Animation *animation, AnimationCurve curve);
+bool animation_set_handlers(Animation *animation, AnimationHandlers callbacks, void *context);
+bool animation_schedule(Animation *animation);
+bool animation_unschedule(Animation *animation);
+
 TextLayer *text_layer_create(GRect frame);
 void text_layer_destroy(TextLayer *text_layer);
 Layer *text_layer_get_layer(TextLayer *text_layer);
