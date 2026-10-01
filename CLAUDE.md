@@ -93,7 +93,7 @@ Clay-Config wird beim Öffnen (`showConfiguration`) **dynamisch** aus der gecach
 | Briefing-Wochentage | Checkbox-Gruppe (Default Mo–Fr) |
 | Verschieben erlauben | Toggle (Default **aus**); an → Schreibrechte, einmalige Neuanmeldung |
 | Verschieben: Erlaubt für | Auswahl: `solo` = eigene Termine ohne Teilnehmer (Default) / `own` = alle eigenen (Teilnehmer bekommen ein Update) |
-| Verschieben: Möglichkeiten | Checkbox-Gruppe: 1 Stunde / 1 Tag / 2 Tage / 1 Woche später (Default 1 Tag + 1 Woche, Bitmaske `moveOptions`) |
+| Verschieben: Möglichkeiten | Checkbox-Gruppe: 1 Stunde / 1 Tag / 2 Tage / 1 Woche später / nächster Montag (Default 1 Tag + 1 Woche, Bitmaske `moveOptions`) |
 | Abmelden | Toggle → Tokens löschen |
 
 Clay füllt `meta.activeWatchInfo` nur beim `ready`-Event – bei der pro Öffnen neu erzeugten Instanz setzt `index.js` das selbst (sonst zeigt der Farbwähler nur Schwarz/Weiß). Keine `capabilities` in der Config verwenden (Clay kennt neuere Plattformen nicht).
@@ -113,7 +113,7 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 | `EVT_LOCATION` | cstring | max. 40 Zeichen **und** max. 47 Byte UTF-8 |
 | `EVT_KEY` | int32 | Kennung des Termins (bei MSG_TYPE 1, 6, 12) |
 | `EVT_FLAGS` | int | bei MSG_TYPE 1: Bit 0 = verschiebbar, Bit 1 = nicht Organisator, Bit 2 = hat Teilnehmer, Bit 3 = Verschieben am Handy an (`lib.moveFlags`) |
-| `MOVE_OPT` | int | bei MSG_TYPE 13: 0 = +1 Stunde, 1 = +1 Tag, 2 = +2 Tage, 3 = +1 Woche |
+| `MOVE_OPT` | int | bei MSG_TYPE 13: 0 = +1 Stunde, 1 = +1 Tag, 2 = +2 Tage, 3 = +1 Woche, 4 = nächster Montag (gleiche Uhrzeit; Termin am Montag → Montag in einer Woche) |
 | `MOVE_OK` | int | bei MSG_TYPE 7: 1 = verschoben, 0 = Fehler (Text in `STATUS_TEXT`) |
 | `SET_MOVE_OPTS` | int | Bitmaske der erlaubten Optionen, 0 = Verschieben aus |
 | `NOTE_TEXT` | cstring | bei MSG_TYPE 6: aufbereitete Beschreibung (max. 400 Byte), leer = keine |

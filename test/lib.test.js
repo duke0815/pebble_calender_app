@@ -238,6 +238,12 @@ test('Verschieben: Berechtigung, Zeiten, Graph-Body', function() {
   var week = lib.shiftEvent(e, 3);
   assert.strictEqual(week.start, local(2026, 10, 31, 9), 'lokale Uhrzeit bleibt');
   assert.strictEqual(lib.shiftEvent(e, 0).start, e.start + 3600);
+  // Nächster Montag: Sa 24.10. -> Mo 26.10. (über die Zeitumstellung), Mo 26.10. -> Mo 02.11.
+  assert.strictEqual(lib.shiftEvent(e, 4).start, local(2026, 10, 26, 9));
+  var monday = { start: local(2026, 10, 26, 14), end: local(2026, 10, 26, 15), allDay: false };
+  assert.strictEqual(lib.shiftEvent(monday, 4).start, local(2026, 11, 2, 14));
+  var sunday = { start: local(2026, 11, 1), end: local(2026, 11, 2), allDay: true };
+  assert.strictEqual(lib.shiftEvent(sunday, 4).start, local(2026, 11, 2));
   assert.deepStrictEqual(lib.graphMoveBody(e, 1), {
     start: { dateTime: new Date(local(2026, 10, 25, 9) * 1000).toISOString().slice(0, 19), timeZone: 'UTC' },
     end: { dateTime: new Date(local(2026, 10, 25, 10) * 1000).toISOString().slice(0, 19), timeZone: 'UTC' }

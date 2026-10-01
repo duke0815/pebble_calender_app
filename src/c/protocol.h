@@ -26,7 +26,8 @@
 #define MOVE_OPT_DAY   1
 #define MOVE_OPT_2DAYS 2
 #define MOVE_OPT_WEEK  3
-#define MOVE_OPT_COUNT 4
+#define MOVE_OPT_MONDAY 4   // nächster Montag (Termin am Montag: Montag in einer Woche)
+#define MOVE_OPT_COUNT 5
 
 // STATUS_CODE
 #define STATUS_SYNCING        1

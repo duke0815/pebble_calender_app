@@ -21,8 +21,15 @@ var MOVE_OPTIONS = [
   { hours: 1 },   // 0: 1 Stunde später
   { days: 1 },    // 1: 1 Tag später
   { days: 2 },    // 2: 2 Tage später
-  { days: 7 }     // 3: 1 Woche später
+  { days: 7 },    // 3: 1 Woche später
+  { weekday: 1 }  // 4: nächster Montag (ist der Termin montags: Montag in einer Woche)
 ];
+
+// Tage bis zum nächsten Wochentag wday (0 = Sonntag) nach dem Datum des Termins, 1..7
+function daysUntilWeekday(sec, wday) {
+  var current = new Date(sec * 1000).getDay();
+  return ((wday - current + 6) % 7) + 1;
+}
 
 var STATUS = {
   SYNCING: 1,
@@ -292,9 +299,10 @@ function shiftEvent(e, opt) {
     if (e.allDay) return null;
     return { start: e.start + o.hours * 3600, end: e.end + o.hours * 3600 };
   }
+  var days = o.weekday !== undefined ? daysUntilWeekday(e.start, o.weekday) : o.days;
   function addDays(sec) {
     var d = new Date(sec * 1000);
-    d.setDate(d.getDate() + o.days);
+    d.setDate(d.getDate() + days);
     return Math.floor(d.getTime() / 1000);
   }
   return { start: addDays(e.start), end: addDays(e.end) };

@@ -35,7 +35,7 @@ var STRINGS = {
     cfgMoveSolo: 'Eigene Termine ohne Teilnehmer',
     cfgMoveOwn: 'Alle eigenen Termine (Teilnehmer erhalten ein Update)',
     cfgMoveOptions: 'Möglichkeiten',
-    moveOptionLabels: ['1 Stunde später', '1 Tag später', '2 Tage später', '1 Woche später'],
+    moveOptionLabels: ['1 Stunde später', '1 Tag später', '2 Tage später', '1 Woche später', 'Nächster Montag'],
     cfgLanguage: 'Sprache',
     cfgTouch: 'Touch-Bedienung',
     cfgTouchDesc: 'Wischen links/rechts wechselt den Tag, hoch/runter scrollt, Tippen öffnet einen Termin. ' +
@@ -90,7 +90,7 @@ var STRINGS = {
     cfgMoveSolo: 'Own events without attendees',
     cfgMoveOwn: 'All own events (attendees get an update)',
     cfgMoveOptions: 'Options',
-    moveOptionLabels: ['1 hour later', '1 day later', '2 days later', '1 week later'],
+    moveOptionLabels: ['1 hour later', '1 day later', '2 days later', '1 week later', 'Next Monday'],
     cfgLanguage: 'Language',
     cfgTouch: 'Touch control',
     cfgTouchDesc: 'Swipe left/right to change the day, up/down to scroll, tap to open an event. ' +

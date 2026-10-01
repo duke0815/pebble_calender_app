@@ -21,7 +21,7 @@
 #define CLOSE_AFTER_MS 1500
 
 static const StrId OPTION_LABELS[MOVE_OPT_COUNT] = {
-  STR_MOVE_OPT_HOUR, STR_MOVE_OPT_DAY, STR_MOVE_OPT_2DAYS, STR_MOVE_OPT_WEEK
+  STR_MOVE_OPT_HOUR, STR_MOVE_OPT_DAY, STR_MOVE_OPT_2DAYS, STR_MOVE_OPT_WEEK, STR_MOVE_OPT_MONDAY
 };
 
 static CalEvent s_event;
@@ -56,9 +56,14 @@ static bool prv_option_fits(int opt) {
 
 static time_t prv_target_start(int opt) {
   if (opt == MOVE_OPT_HOUR) return s_event.start + 3600;
-  int days = opt == MOVE_OPT_DAY ? 1 : (opt == MOVE_OPT_2DAYS ? 2 : 7);
   time_t start = s_event.start;
   struct tm *tm = localtime(&start);
+  int days;
+  if (opt == MOVE_OPT_MONDAY) {
+    days = ((1 - tm->tm_wday + 6) % 7) + 1;  // 1..7 Tage bis zum nächsten Montag
+  } else {
+    days = opt == MOVE_OPT_DAY ? 1 : (opt == MOVE_OPT_2DAYS ? 2 : 7);
+  }
   return time_make_local(start, days, tm->tm_hour, tm->tm_min);
 }
 
