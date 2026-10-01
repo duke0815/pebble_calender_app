@@ -7,6 +7,7 @@
 #include "ui_main.h"
 #include "ui_login.h"
 #include "ui_detail.h"
+#include "i18n.h"
 
 #define SYNC_TIMEOUT_MS        30000
 #define WAKEUP_SYNC_TIMEOUT_MS 10000
@@ -61,13 +62,13 @@ static void prv_update_status(void) {
 
   switch (s_state) {
     case STATE_SYNCING:
-      snprintf(status, sizeof(status), "Aktualisiere...");
+      snprintf(status, sizeof(status), "%s", tr(STR_UPDATING));
       break;
     case STATE_OFFLINE:
       if (last) {
-        snprintf(status, sizeof(status), "Offline - Stand %s", stamp);
+        snprintf(status, sizeof(status), tr(STR_OFFLINE_AS_OF), stamp);
       } else {
-        snprintf(status, sizeof(status), "Offline");
+        snprintf(status, sizeof(status), "%s", tr(STR_OFFLINE));
       }
       break;
     case STATE_ERROR:
@@ -81,19 +82,19 @@ static void prv_update_status(void) {
   const char *empty;
   if (!events_view_available()) {
     if (s_day_loading || s_state == STATE_SYNCING) {
-      empty = "Lade Termine...";
+      empty = tr(STR_LOADING_EVENTS);
     } else if (s_state == STATE_ERROR) {
       empty = s_error;
     } else {
-      empty = "Keine Verbindung zum Handy.";
+      empty = tr(STR_NO_PHONE);
     }
   } else if (s_state == STATE_ERROR && today) {
     empty = s_error;
   } else {
-    empty = today ? "Keine Termine heute" : "Keine Termine";
+    empty = tr(today ? STR_NO_EVENTS_TODAY : STR_NO_EVENTS);
   }
   if (s_day_loading) {
-    snprintf(status, sizeof(status), "Lade Tag...");
+    snprintf(status, sizeof(status), "%s", tr(STR_LOADING_DAY));
   }
   ui_main_set_status(status, empty);
 }
@@ -228,7 +229,7 @@ static void prv_list_updated(bool complete, time_t list_day, int list_days) {
   if (complete) {
     prv_set_state(STATE_IDLE);
   } else {
-    snprintf(s_error, sizeof(s_error), "Übertragung unvollständig");
+    snprintf(s_error, sizeof(s_error), "%s", tr(STR_TRANSFER_INCOMPLETE));
     prv_set_state(STATE_ERROR);
   }
   ui_main_reload(true);
@@ -250,7 +251,7 @@ static void prv_status(int code, const char *text) {
     prv_set_state(STATE_OFFLINE);
     return;
   }
-  snprintf(s_error, sizeof(s_error), "%s", text[0] ? text : "Fehler");
+  snprintf(s_error, sizeof(s_error), "%s", text[0] ? text : tr(STR_ERROR));
   prv_set_state(STATE_ERROR);
   ui_main_reload(false);
 }
@@ -262,6 +263,7 @@ static void prv_login_code(const char *url, const char *code) {
 }
 
 static void prv_settings_changed(void) {
+  ui_main_apply_theme();
   prv_update_status();
   ui_main_reload(true);
 }

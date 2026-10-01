@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include "../../src/c/events.h"
 #include "../../src/c/settings.h"
+#include "../../src/c/i18n.h"
+#include "../../src/c/theme.h"
+#include "../../src/c/format.h"
 
 // --- Fakes ------------------------------------------------------------------
 #define NKEYS 256
@@ -36,6 +39,9 @@ WakeupId wakeup_schedule(time_t ts, int32_t cookie, bool notify) {
 }
 void wakeup_cancel_all(void) { s_wakeup_count = 0; }
 void app_log(uint8_t l, const char *f, int n, const char *fmt, ...) {}
+static const char *s_locale = "de_DE";
+const char *i18n_get_system_locale(void) { return s_locale; }
+bool clock_is_24h_style(void) { return true; }
 
 static time_t local(int y, int mo, int d, int h, int mi) {
   struct tm tm = { .tm_year = y - 1900, .tm_mon = mo - 1, .tm_mday = d, .tm_hour = h, .tm_min = mi, .tm_isdst = -1 };
@@ -162,6 +168,32 @@ int main(void) {
   // Tagesbeginn am Umstellungstag (So 25.10., 12:00 MEZ) = 00:00 MESZ
   assert(time_day_start(local(2026, 10, 25, 12, 0)) == local(2026, 10, 25, 0, 0));
   assert(time_day_start(local(2026, 3, 29, 12, 0)) == local(2026, 3, 29, 0, 0));
+
+  // Sprache: Standard aus Systemsprache, Texte und Datumsformat
+  assert(settings_get()->lang == LANG_DE);
+  char buf[40];
+  st->lang = LANG_DE;
+  s_now = local(2026, 10, 1, 10, 0);
+  format_day(local(2026, 10, 1, 0, 0), buf, sizeof(buf));
+  assert(strcmp(buf, "Heute, Do 01.10.") == 0);
+  st->lang = LANG_EN;
+  format_day(local(2026, 10, 2, 0, 0), buf, sizeof(buf));
+  assert(strcmp(buf, "Tomorrow, Fri Oct 2") == 0);
+  format_day(local(2026, 10, 5, 0, 0), buf, sizeof(buf));
+  assert(strcmp(buf, "Mon Oct 5") == 0);
+  assert(strcmp(tr(STR_NO_EVENTS_TODAY), "No events today") == 0);
+  s_locale = "en_US";
+  settings_load();  // gespeicherte Settings? hier keine -> Standard aus Locale
+  assert(settings_get()->lang == LANG_EN);
+
+  // Farben: Kontrastschrift auf Akzent, Grau für vergangene Termine
+  st = settings_get();
+  st->color_accent = 0x0055AA; st->color_bg = 0xFFFFFF;
+  assert(theme_on_accent().argb == GColorWhite.argb);
+  assert(theme_muted().argb == GColorDarkGray.argb);
+  st->color_accent = 0xFFFF00; st->color_bg = 0x000000;
+  assert(theme_on_accent().argb == GColorBlack.argb);
+  assert(theme_muted().argb == GColorLightGray.argb);
 
   printf("Uhr-Logik ok\n");
   return 0;

@@ -2,6 +2,8 @@
 #include "ui_detail.h"
 #include "events.h"
 #include "format.h"
+#include "i18n.h"
+#include "theme.h"
 
 #if defined(PBL_PLATFORM_EMERY)
   #define FONT_TIME   FONT_KEY_GOTHIC_18_BOLD
@@ -26,9 +28,6 @@
 #define HEADER_H     (H_TIME + 4)
 #define INFO_ROW_H   (H_TITLE * 3 + 2 * PAD_Y)
 
-#define COLOR_ACCENT PBL_IF_COLOR_ELSE(GColorCobaltBlue, GColorBlack)
-#define COLOR_BAR    PBL_IF_COLOR_ELSE(GColorOxfordBlue, GColorBlack)
-#define COLOR_PAST   PBL_IF_COLOR_ELSE(GColorDarkGray, GColorBlack)
 
 static Window *s_window;
 static TextLayer *s_status_layer;
@@ -37,7 +36,7 @@ static UiMainCallbacks s_callbacks;
 
 static char s_date_text[32];
 static char s_status_text[64];
-static char s_empty_text[96] = "Lade Termine...";
+static char s_empty_text[96];
 
 static void prv_interaction(void) {
   if (s_callbacks.interaction) s_callbacks.interaction();
@@ -75,9 +74,9 @@ static int16_t prv_cell_height(MenuLayer *menu, MenuIndex *index, void *ctx) {
 static void prv_draw_header(GContext *ctx, const Layer *cell, uint16_t section, void *data) {
   if (!s_status_text[0]) return;
   GRect bounds = layer_get_bounds(cell);
-  graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorLightGray, GColorBlack));
+  graphics_context_set_fill_color(ctx, theme_header_bg());
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
-  graphics_context_set_text_color(ctx, PBL_IF_COLOR_ELSE(GColorBlack, GColorWhite));
+  graphics_context_set_text_color(ctx, theme_header_text());
   graphics_draw_text(ctx, s_status_text, fonts_get_system_font(FONT_LOC),
                      GRect(PAD_X, -2, bounds.size.w - 2 * PAD_X, HEADER_H),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
@@ -87,7 +86,7 @@ static void prv_draw_event(GContext *ctx, const Layer *cell, const CalEvent *e) 
   GRect bounds = layer_get_bounds(cell);
   bool highlighted = menu_cell_layer_is_highlighted(cell);
   bool past = e->end <= time(NULL);
-  GColor text_color = highlighted ? GColorWhite : (past ? COLOR_PAST : GColorBlack);
+  GColor text_color = highlighted ? theme_on_accent() : (past ? theme_muted() : theme_text());
   graphics_context_set_text_color(ctx, text_color);
 
   int16_t w = bounds.size.w - 2 * PAD_X;
@@ -99,7 +98,7 @@ static void prv_draw_event(GContext *ctx, const Layer *cell, const CalEvent *e) 
                      GRect(PAD_X, y - 2, w, H_TIME), GTextOverflowModeTrailingEllipsis,
                      GTextAlignmentLeft, NULL);
   y += H_TIME;
-  graphics_draw_text(ctx, e->title[0] ? e->title : "(ohne Titel)", fonts_get_system_font(FONT_TITLE),
+  graphics_draw_text(ctx, e->title[0] ? e->title : tr(STR_NO_TITLE), fonts_get_system_font(FONT_TITLE),
                      GRect(PAD_X, y - 4, w, H_TITLE), GTextOverflowModeTrailingEllipsis,
                      GTextAlignmentLeft, NULL);
   y += H_TITLE;
@@ -112,7 +111,7 @@ static void prv_draw_event(GContext *ctx, const Layer *cell, const CalEvent *e) 
 
 static void prv_draw_info(GContext *ctx, const Layer *cell) {
   GRect bounds = layer_get_bounds(cell);
-  graphics_context_set_text_color(ctx, menu_cell_layer_is_highlighted(cell) ? GColorWhite : GColorBlack);
+  graphics_context_set_text_color(ctx, menu_cell_layer_is_highlighted(cell) ? theme_on_accent() : theme_text());
   graphics_draw_text(ctx, s_empty_text, fonts_get_system_font(FONT_TITLE),
                      GRect(PAD_X, PAD_Y, bounds.size.w - 2 * PAD_X, bounds.size.h - 2 * PAD_Y),
                      GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
@@ -180,8 +179,6 @@ static void prv_window_load(Window *window) {
   GRect bounds = layer_get_bounds(root);
 
   s_status_layer = text_layer_create(GRect(0, 0, bounds.size.w, STATUS_H));
-  text_layer_set_background_color(s_status_layer, COLOR_BAR);
-  text_layer_set_text_color(s_status_layer, GColorWhite);
   text_layer_set_font(s_status_layer, fonts_get_system_font(FONT_TIME));
   text_layer_set_text_alignment(s_status_layer, GTextAlignmentCenter);
   text_layer_set_overflow_mode(s_status_layer, GTextOverflowModeTrailingEllipsis);
@@ -199,13 +196,13 @@ static void prv_window_load(Window *window) {
     .select_click = prv_select,
     .selection_changed = prv_selection_changed,
   });
-  menu_layer_set_highlight_colors(s_menu_layer, COLOR_ACCENT, GColorWhite);
 #if defined(PBL_TOUCH)
   window_set_click_config_provider(window, prv_click_config);
 #else
   menu_layer_set_click_config_onto_window(s_menu_layer, window);
 #endif
   layer_add_child(root, menu_layer_get_layer(s_menu_layer));
+  ui_main_apply_theme();
 }
 
 static void prv_window_appear(Window *window) {
@@ -219,8 +216,23 @@ static void prv_window_unload(Window *window) {
   s_status_layer = NULL;
 }
 
+void ui_main_apply_theme(void) {
+  if (!s_window) return;
+  window_set_background_color(s_window, theme_bg());
+  if (s_status_layer) {
+    text_layer_set_background_color(s_status_layer, theme_accent());
+    text_layer_set_text_color(s_status_layer, theme_on_accent());
+  }
+  if (s_menu_layer) {
+    menu_layer_set_normal_colors(s_menu_layer, theme_bg(), theme_text());
+    menu_layer_set_highlight_colors(s_menu_layer, theme_accent(), theme_on_accent());
+    layer_mark_dirty(menu_layer_get_layer(s_menu_layer));
+  }
+}
+
 void ui_main_push(UiMainCallbacks callbacks) {
   s_callbacks = callbacks;
+  snprintf(s_empty_text, sizeof(s_empty_text), "%s", tr(STR_LOADING_EVENTS));
   s_window = window_create();
   window_set_window_handlers(s_window, (WindowHandlers) {
     .load = prv_window_load,

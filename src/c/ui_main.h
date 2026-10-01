@@ -7,6 +7,8 @@ typedef struct {
 } UiMainCallbacks;
 
 void ui_main_push(UiMainCallbacks callbacks);
+// Farben aus den Einstellungen neu anwenden
+void ui_main_apply_theme(void);
 void ui_main_destroy(void);
 
 // Ansicht neu berechnen; optional Auswahl auf den nächsten anstehenden Termin setzen.

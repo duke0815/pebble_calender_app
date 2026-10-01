@@ -1,6 +1,6 @@
 #include "format.h"
-
-static const char *const WEEKDAYS[] = { "So", "Mo", "Di", "Mi", "Do", "Fr", "Sa" };
+#include "i18n.h"
+#include "settings.h"
 
 void format_clock(time_t t, char *buf, size_t size) {
   struct tm *tm = localtime(&t);
@@ -9,7 +9,7 @@ void format_clock(time_t t, char *buf, size_t size) {
 
 void format_event_time(const CalEvent *e, char *buf, size_t size) {
   if (e->all_day) {
-    snprintf(buf, size, "Ganztägig");
+    snprintf(buf, size, "%s", tr(STR_ALL_DAY));
     return;
   }
   char from[10];
@@ -21,7 +21,11 @@ void format_event_time(const CalEvent *e, char *buf, size_t size) {
 
 void format_date_short(time_t t, char *buf, size_t size) {
   struct tm *tm = localtime(&t);
-  snprintf(buf, size, "%s %02d.%02d.", WEEKDAYS[tm->tm_wday % 7], tm->tm_mday, tm->tm_mon + 1);
+  if (settings_get()->lang == LANG_EN) {
+    snprintf(buf, size, "%s %s %d", tr_weekday(tm->tm_wday), tr_month(tm->tm_mon), tm->tm_mday);
+  } else {
+    snprintf(buf, size, "%s %02d.%02d.", tr_weekday(tm->tm_wday), tm->tm_mday, tm->tm_mon + 1);
+  }
 }
 
 void format_day(time_t day, char *buf, size_t size) {
@@ -30,9 +34,9 @@ void format_day(time_t day, char *buf, size_t size) {
   char date[16];
   format_date_short(day, date, sizeof(date));
   if (day == today) {
-    snprintf(buf, size, "Heute, %s", date);
+    snprintf(buf, size, "%s, %s", tr(STR_TODAY), date);
   } else if (day == tomorrow) {
-    snprintf(buf, size, "Morgen, %s", date);
+    snprintf(buf, size, "%s, %s", tr(STR_TOMORROW), date);
   } else {
     snprintf(buf, size, "%s", date);
   }

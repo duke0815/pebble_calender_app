@@ -1,6 +1,8 @@
 // Reine Logik ohne Pebble-/Netzwerk-Abhaengigkeiten – mit Node testbar (test/lib.test.js).
 // ES5, da PebbleKit JS nicht ueberall moderne Syntax unterstuetzt.
 
+var i18n = require('./i18n');
+
 var MSG = {
   EVENT: 1,
   END: 2,
@@ -35,7 +37,11 @@ var DEFAULT_SETTINGS = {
   hideDeclined: true,
   briefEnabled: false,
   briefTime: '07:00',
-  briefDays: 62               // Bitmaske, Bit 0 = Sonntag; Mo-Fr
+  briefDays: 62,              // Bitmaske, Bit 0 = Sonntag; Mo-Fr
+  language: 'auto',           // 'auto' | 'de' | 'en'
+  accentColor: 0x0055AA,      // 0xRRGGBB (Pebble-Palette)
+  textColor: 0x000000,
+  bgColor: 0xFFFFFF
 };
 
 function mergeSettings(stored) {
@@ -239,26 +245,26 @@ function classifyAuthError(json) {
   var match = /AADSTS(\d+)/.exec(desc);
   var aad = match ? match[1] : '';
   if (ADMIN_CONSENT_CODES.indexOf(aad) >= 0) {
-    return { code: STATUS.ADMIN_CONSENT, text: 'Deine Firmen-IT muss die App freigeben.', clearTokens: true };
+    return { code: STATUS.ADMIN_CONSENT, text: i18n.t('adminConsent'), clearTokens: true };
   }
   if (POLICY_CODES.indexOf(aad) >= 0) {
-    return { code: STATUS.POLICY_BLOCKED, text: 'Firmenrichtlinie blockiert diese Anmeldung.', clearTokens: true };
+    return { code: STATUS.POLICY_BLOCKED, text: i18n.t('policyBlocked'), clearTokens: true };
   }
   if (json.error === 'invalid_grant' || json.error === 'interaction_required' ||
       json.error === 'expired_token' || json.error === 'authorization_declined' ||
       json.error === 'bad_verification_code') {
-    return { code: STATUS.NEED_LOGIN, text: 'Bitte App neu öffnen zum Anmelden.', clearTokens: true };
+    return { code: STATUS.NEED_LOGIN, text: i18n.t('reopenLogin'), clearTokens: true };
   }
   if (json.error === 'invalid_client' || json.error === 'unauthorized_client') {
-    return { code: STATUS.CONFIG, text: 'App-Registrierung fehlerhaft (Client-ID).', clearTokens: true };
+    return { code: STATUS.CONFIG, text: i18n.t('badClient'), clearTokens: true };
   }
-  return { code: STATUS.ERROR, text: 'Anmeldefehler' + (aad ? ' ' + aad : ''), clearTokens: false };
+  return { code: STATUS.ERROR, text: i18n.t('authError') + (aad ? ' ' + aad : ''), clearTokens: false };
 }
 
 function graphErrorStatus(httpStatus) {
-  if (httpStatus === 0) return { code: STATUS.NETWORK, text: 'Keine Verbindung.' };
-  if (httpStatus === 403) return { code: STATUS.ERROR, text: 'Kein Zugriff auf Kalender.' };
-  return { code: STATUS.ERROR, text: 'Graph-Fehler ' + httpStatus };
+  if (httpStatus === 0) return { code: STATUS.NETWORK, text: i18n.t('noConnection') };
+  if (httpStatus === 403) return { code: STATUS.ERROR, text: i18n.t('noCalendarAccess') };
+  return { code: STATUS.ERROR, text: i18n.t('graphError') + ' ' + httpStatus };
 }
 
 function formEncode(obj) {

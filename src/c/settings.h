@@ -6,6 +6,11 @@ typedef struct {
   uint8_t brief_hour;
   uint8_t brief_minute;
   uint8_t brief_days;   // Bit 0 = Sonntag ... Bit 6 = Samstag
+  uint8_t lang;         // LANG_DE / LANG_EN (i18n.h)
+  uint8_t reserved[3];
+  uint32_t color_accent;  // 0xRRGGBB
+  uint32_t color_text;
+  uint32_t color_bg;
 } Settings;
 
 void settings_load(void);

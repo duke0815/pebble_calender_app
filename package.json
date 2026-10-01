@@ -44,7 +44,11 @@
       "SET_BRIEF_DAYS",
       "REQ_DAY",
       "LIST_DAY",
-      "LIST_DAYS"
+      "LIST_DAYS",
+      "SET_LANG",
+      "SET_COLOR_ACCENT",
+      "SET_COLOR_TEXT",
+      "SET_COLOR_BG"
     ],
     "resources": {
       "media": [

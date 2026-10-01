@@ -1,5 +1,6 @@
 #include "settings.h"
 #include "events.h"
+#include "i18n.h"
 
 #define PERSIST_KEY_SETTINGS 4
 #define WAKEUP_COOKIE_BRIEFING 1
@@ -13,6 +14,10 @@ static void prv_defaults(void) {
     .brief_hour = 7,
     .brief_minute = 0,
     .brief_days = 0x3E,  // Mo-Fr
+    .lang = i18n_default_lang(),
+    .color_accent = 0x0055AA,  // Kobaltblau
+    .color_text = 0x000000,
+    .color_bg = 0xFFFFFF,
   };
 }
 

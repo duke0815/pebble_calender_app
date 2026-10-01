@@ -168,6 +168,41 @@ test('Clay-Konfiguration: Defaults und Rückweg', function() {
   assert.strictEqual(applied.logout, false);
 });
 
+test('Sprache: Auflösung und Übersetzung', function() {
+  var i18n = require('../src/pkjs/i18n');
+  assert.strictEqual(i18n.resolveLang('auto', 'de-AT'), 'de');
+  assert.strictEqual(i18n.resolveLang('auto', 'en-US'), 'en');
+  assert.strictEqual(i18n.resolveLang('auto', ''), 'en');
+  assert.strictEqual(i18n.resolveLang('de', 'en-US'), 'de');
+  i18n.setLang('en');
+  assert.strictEqual(lib.classifyAuthError({ error: 'invalid_grant' }).text, 'Please reopen the app to sign in.');
+  assert.strictEqual(lib.graphErrorStatus(500).text, 'Graph error 500');
+  var cfg = config.buildConfig([], lib.mergeSettings({}), false);
+  assert.strictEqual(cfg[cfg.length - 1].defaultValue, 'Save');
+  i18n.setLang('de');
+  assert.strictEqual(lib.classifyAuthError({ error: 'invalid_grant' }).text, 'Bitte App neu öffnen zum Anmelden.');
+});
+
+test('Clay: Farben und Sprache', function() {
+  var settings = lib.mergeSettings({});
+  var cfg = config.buildConfig([], settings, true);
+  var colors = cfg.filter(function(s) { return s.items && s.items.some(function(i) { return i.type === 'color'; }); })[0];
+  assert.deepStrictEqual(colors.items.slice(1).map(function(i) { return i.defaultValue; }), ['0055AA', '000000', 'FFFFFF']);
+  var applied = config.applyResult({
+    CFG_LANG: { value: 'en' },
+    CFG_COLOR_ACCENT: { value: 0xFF5500 },
+    CFG_COLOR_TEXT: { value: 'FFFFFF' },
+    CFG_COLOR_BG: { value: 0x000000 }
+  }, [], settings);
+  assert.strictEqual(applied.settings.language, 'en');
+  assert.strictEqual(applied.settings.accentColor, 0xFF5500);
+  assert.strictEqual(applied.settings.textColor, 0xFFFFFF);
+  assert.strictEqual(applied.settings.bgColor, 0x000000);
+  var bad = config.applyResult({ CFG_LANG: { value: 'xx' }, CFG_COLOR_BG: { value: 'kaputt' } }, [], settings);
+  assert.strictEqual(bad.settings.language, 'auto');
+  assert.strictEqual(bad.settings.bgColor, 0xFFFFFF);
+});
+
 var failed = 0;
 tests.forEach(function(t) {
   try {

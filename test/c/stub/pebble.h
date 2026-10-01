@@ -27,6 +27,8 @@ typedef GColor8 GColor;
 #define GColorOxfordBlue ((GColor8){.argb=0xC1})
 #define GColorDarkGray ((GColor8){.argb=0xD5})
 #define GColorLightGray ((GColor8){.argb=0xEA})
+#define GColorFromRGB(red, green, blue) ((GColor8){.a = 3, .r = (uint8_t)(red) >> 6, .g = (uint8_t)(green) >> 6, .b = (uint8_t)(blue) >> 6})
+#define GColorFromHEX(v) GColorFromRGB((((v) >> 16) & 0xff), (((v) >> 8) & 0xff), ((v) & 0xff))
 #ifdef PBL_COLOR
 #define PBL_IF_COLOR_ELSE(a,b) (a)
 #else
@@ -54,6 +56,7 @@ typedef void (*WindowHandler)(Window *window);
 typedef struct { WindowHandler load, appear, disappear, unload; } WindowHandlers;
 Window *window_create(void);
 void window_destroy(Window *window);
+void window_set_background_color(Window *window, GColor background_color);
 void window_set_window_handlers(Window *window, WindowHandlers handlers);
 Layer *window_get_root_layer(const Window *window);
 void window_stack_push(Window *window, bool animated);
@@ -124,6 +127,7 @@ void menu_layer_reload_data(MenuLayer *menu_layer);
 MenuIndex menu_layer_get_selected_index(const MenuLayer *menu_layer);
 void menu_layer_set_selected_index(MenuLayer *menu_layer, MenuIndex index, MenuRowAlign scroll_align, bool animated);
 void menu_layer_set_selected_next(MenuLayer *menu_layer, bool up, MenuRowAlign scroll_align, bool animated);
+void menu_layer_set_normal_colors(MenuLayer *menu_layer, GColor background, GColor foreground);
 void menu_layer_set_highlight_colors(MenuLayer *menu_layer, GColor background, GColor foreground);
 bool menu_cell_layer_is_highlighted(const Layer *cell_layer);
 void menu_cell_basic_draw(GContext *ctx, const Layer *cell_layer, const char *title, const char *subtitle, GBitmap *icon);
@@ -160,7 +164,8 @@ extern uint32_t MESSAGE_KEY_MSG_TYPE, MESSAGE_KEY_EVT_INDEX, MESSAGE_KEY_EVT_COU
   MESSAGE_KEY_EVT_END, MESSAGE_KEY_EVT_ALLDAY, MESSAGE_KEY_EVT_TITLE, MESSAGE_KEY_EVT_LOCATION,
   MESSAGE_KEY_STATUS_CODE, MESSAGE_KEY_STATUS_TEXT, MESSAGE_KEY_LOGIN_URL, MESSAGE_KEY_LOGIN_CODE,
   MESSAGE_KEY_SET_BRIEF_ENABLED, MESSAGE_KEY_SET_BRIEF_HOUR, MESSAGE_KEY_SET_BRIEF_MINUTE,
-  MESSAGE_KEY_SET_BRIEF_DAYS, MESSAGE_KEY_REQ_DAY, MESSAGE_KEY_LIST_DAY, MESSAGE_KEY_LIST_DAYS;
+  MESSAGE_KEY_SET_BRIEF_DAYS, MESSAGE_KEY_REQ_DAY, MESSAGE_KEY_LIST_DAY, MESSAGE_KEY_LIST_DAYS,
+  MESSAGE_KEY_SET_LANG, MESSAGE_KEY_SET_COLOR_ACCENT, MESSAGE_KEY_SET_COLOR_TEXT, MESSAGE_KEY_SET_COLOR_BG;
 
 typedef int32_t status_t;
 typedef enum { S_SUCCESS = 0, E_ERROR = -1, E_RANGE = -8 } StatusCode;
@@ -203,6 +208,7 @@ void app_touch_navigation_enable(bool enable);
 #endif
 bool connection_service_peek_pebble_app_connection(void);
 bool clock_is_24h_style(void);
+const char *i18n_get_system_locale(void);
 uint16_t time_ms(time_t *t_utc, uint16_t *out_ms);
 void app_event_loop(void);
 

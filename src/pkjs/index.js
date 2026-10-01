@@ -4,6 +4,7 @@
 var Clay = require('pebble-clay');
 var messageKeys = require('message_keys');
 var lib = require('./lib');
+var i18n = require('./i18n');
 var configPage = require('./config');
 
 // --- Konfiguration ----------------------------------------------------------
@@ -37,8 +38,16 @@ function save(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+// Liefert die Settings und stellt die Sprache für Statusmeldungen ein.
+function applyLanguage(settings) {
+  var phoneLang = (typeof navigator !== 'undefined' && navigator.language) || '';
+  i18n.setLang(i18n.resolveLang(settings.language, phoneLang));
+}
+
 function getSettings() {
-  return lib.mergeSettings(load('settings', null));
+  var settings = lib.mergeSettings(load('settings', null));
+  applyLanguage(settings);
+  return settings;
 }
 
 function getAuth() {
@@ -88,13 +97,18 @@ function sendStatus(code, text) {
 }
 
 function sendSettings(settings) {
+  applyLanguage(settings);
   var t = lib.parseTime(settings.briefTime);
   enqueue({
     MSG_TYPE: MSG.SETTINGS,
     SET_BRIEF_ENABLED: settings.briefEnabled ? 1 : 0,
     SET_BRIEF_HOUR: t.hour,
     SET_BRIEF_MINUTE: t.minute,
-    SET_BRIEF_DAYS: settings.briefDays
+    SET_BRIEF_DAYS: settings.briefDays,
+    SET_LANG: i18n.getLang() === 'en' ? 1 : 0,
+    SET_COLOR_ACCENT: settings.accentColor,
+    SET_COLOR_TEXT: settings.textColor,
+    SET_COLOR_BG: settings.bgColor
   });
 }
 
@@ -166,7 +180,7 @@ function storeTokens(json) {
 // callback(err, accessToken); err = {code, text}
 function getToken(callback) {
   if (CLIENT_ID === 'TODO') {
-    callback({ code: STATUS.CONFIG, text: 'Client-ID fehlt (index.js).' });
+    callback({ code: STATUS.CONFIG, text: i18n.t('noClientId') });
     return;
   }
   var auth = getAuth();
@@ -191,7 +205,7 @@ function refreshToken(refresh, callback) {
       return;
     }
     if (status === 0) {
-      callback({ code: STATUS.NETWORK, text: 'Keine Verbindung.' });
+      callback({ code: STATUS.NETWORK, text: i18n.t('noConnection') });
       return;
     }
     var err = lib.classifyAuthError(json);
@@ -222,7 +236,7 @@ function startLogin(callback) {
   login = { pending: true };
   postForm(LOGIN_BASE + 'devicecode', { client_id: CLIENT_ID, scope: SCOPE }, function(status, json) {
     if (status !== 200 || !json || !json.device_code) {
-      finishLogin(status === 0 ? { code: STATUS.NETWORK, text: 'Keine Verbindung.' }
+      finishLogin(status === 0 ? { code: STATUS.NETWORK, text: i18n.t('noConnection') }
                                : lib.classifyAuthError(json));
       return;
     }
@@ -246,7 +260,7 @@ function schedulePoll() {
 function pollToken() {
   if (!login) return;
   if (Date.now() > login.expiresAt) {
-    finishLogin({ code: STATUS.NEED_LOGIN, text: 'Code abgelaufen. App neu öffnen.' });
+    finishLogin({ code: STATUS.NEED_LOGIN, text: i18n.t('codeExpired') });
     return;
   }
   postForm(LOGIN_BASE + 'token', {
@@ -356,7 +370,7 @@ function fetchEvents(token, settings, win, callback) {
         return;
       }
       if (status !== 200) {
-        callback(status === 401 ? { code: STATUS.NEED_LOGIN, text: 'Bitte App neu öffnen zum Anmelden.' }
+        callback(status === 401 ? { code: STATUS.NEED_LOGIN, text: i18n.t('reopenLogin') }
                                 : lib.graphErrorStatus(status));
         return;
       }
@@ -416,7 +430,7 @@ function run() {
   var settings = getSettings();
   if (isCache) {
     sendSettings(settings);
-    sendStatus(STATUS.SYNCING, 'Aktualisiere...');
+    sendStatus(STATUS.SYNCING, i18n.t('syncing'));
   }
 
   function done(err) {
@@ -454,6 +468,15 @@ function openConfig() {
   localStorage.removeItem('clay-settings');
   activeClay = new Clay(configPage.buildConfig(configCalendars, getSettings(), !!getAuth()), null,
                         { autoHandleEvents: false });
+  // Clay füllt meta nur beim "ready"-Event. Bei einer später erzeugten Instanz selbst setzen,
+  // sonst bietet der Farbwähler nur Schwarz/Weiß an.
+  try {
+    activeClay.meta.activeWatchInfo = Pebble.getActiveWatchInfo ? Pebble.getActiveWatchInfo() : null;
+    activeClay.meta.accountToken = Pebble.getAccountToken ? Pebble.getAccountToken() : '';
+    activeClay.meta.watchToken = Pebble.getWatchToken ? Pebble.getWatchToken() : '';
+  } catch (e) {
+    console.log('Uhr-Infos nicht verfügbar: ' + e);
+  }
   Pebble.openURL(activeClay.generateUrl());
 }
 
@@ -503,11 +526,11 @@ Pebble.addEventListener('webviewclosed', function(e) {
   save('settings', applied.settings);
 
   if (applied.logout) {
-    if (login) finishLogin({ code: STATUS.NEED_LOGIN, text: 'Abgemeldet.' });
+    if (login) finishLogin({ code: STATUS.NEED_LOGIN, text: i18n.t('loggedOutShort') });
     clearAuth();
     sendSettings(applied.settings);
     sendEvents([], Math.floor(lib.queryWindow(new Date(), 1).start.getTime() / 1000), lib.CACHE_DAYS);
-    sendStatus(STATUS.NEED_LOGIN, 'Abgemeldet. App neu öffnen zum Anmelden.');
+    sendStatus(STATUS.NEED_LOGIN, i18n.t('loggedOut'));
     return;
   }
   sync(true);

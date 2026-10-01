@@ -2,8 +2,26 @@
 // damit die Kalenderliste aktuell ist (siehe CLAUDE.md).
 
 var lib = require('./lib');
+var i18n = require('./i18n');
+var t = i18n.t;
 
-var WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+function hex(color) {
+  var h = (Number(color) & 0xFFFFFF).toString(16);
+  while (h.length < 6) h = '0' + h;
+  return h.toUpperCase();
+}
+
+function colorItem(key, label, value, description) {
+  var item = {
+    type: 'color',
+    messageKey: key,
+    label: label,
+    defaultValue: hex(value),
+    sunlight: false
+  };
+  if (description) item.description = description;
+  return item;
+}
 
 // calendars: [{id, name, isDefaultCalendar}], settings: siehe lib.DEFAULT_SETTINGS
 function buildConfig(calendars, settings, loggedIn) {
@@ -13,7 +31,7 @@ function buildConfig(calendars, settings, loggedIn) {
     calendarItem = {
       type: 'checkboxgroup',
       messageKey: 'CFG_CALENDARS',
-      label: 'Angezeigte Kalender',
+      label: t('cfgShownCalendars'),
       options: calendars.map(function(c) { return c.name; }),
       defaultValue: calendars.map(function(c) {
         return selected.length ? selected.indexOf(c.id) >= 0 : !!c.isDefaultCalendar;
@@ -22,8 +40,7 @@ function buildConfig(calendars, settings, loggedIn) {
   } else {
     calendarItem = {
       type: 'text',
-      defaultValue: 'Noch keine Kalenderliste vorhanden. Bitte zuerst auf der Uhr anmelden – ' +
-                    'bis dahin wird der Standardkalender verwendet.'
+      defaultValue: t('cfgNoCalendars')
     };
   }
 
@@ -32,24 +49,35 @@ function buildConfig(calendars, settings, loggedIn) {
     {
       type: 'section',
       items: [
-        { type: 'heading', defaultValue: 'Kalender' },
+        { type: 'heading', defaultValue: t('cfgCalendars') },
         calendarItem
       ]
     },
     {
       type: 'section',
       items: [
-        { type: 'heading', defaultValue: 'Anzeige' },
+        { type: 'heading', defaultValue: t('cfgDisplay') },
+        {
+          type: 'select',
+          messageKey: 'CFG_LANG',
+          label: t('cfgLanguage'),
+          defaultValue: settings.language,
+          options: [
+            { label: t('cfgLangAuto'), value: 'auto' },
+            { label: 'Deutsch', value: 'de' },
+            { label: 'English', value: 'en' }
+          ]
+        },
         {
           type: 'toggle',
           messageKey: 'CFG_ALLDAY',
-          label: 'Ganztägige Termine anzeigen',
+          label: t('cfgShowAllDay'),
           defaultValue: settings.showAllDay
         },
         {
           type: 'toggle',
           messageKey: 'CFG_HIDE_DECLINED',
-          label: 'Abgelehnte Termine ausblenden',
+          label: t('cfgHideDeclined'),
           defaultValue: settings.hideDeclined
         }
       ]
@@ -57,26 +85,35 @@ function buildConfig(calendars, settings, loggedIn) {
     {
       type: 'section',
       items: [
-        { type: 'heading', defaultValue: 'Tägliches Briefing' },
+        { type: 'heading', defaultValue: t('cfgColors') },
+        colorItem('CFG_COLOR_ACCENT', t('cfgColorAccent'), settings.accentColor, t('cfgColorAccentDesc')),
+        colorItem('CFG_COLOR_TEXT', t('cfgColorText'), settings.textColor),
+        colorItem('CFG_COLOR_BG', t('cfgColorBg'), settings.bgColor)
+      ]
+    },
+    {
+      type: 'section',
+      items: [
+        { type: 'heading', defaultValue: t('cfgBriefing') },
         {
           type: 'toggle',
           messageKey: 'CFG_BRIEF',
-          label: 'Briefing aktivieren',
-          description: 'Die Uhr öffnet die App zur gewählten Uhrzeit und vibriert kurz.',
+          label: t('cfgBriefEnable'),
+          description: t('cfgBriefDesc'),
           defaultValue: settings.briefEnabled
         },
         {
           type: 'input',
           messageKey: 'CFG_BRIEF_TIME',
-          label: 'Uhrzeit',
+          label: t('cfgTime'),
           defaultValue: settings.briefTime,
           attributes: { type: 'time' }
         },
         {
           type: 'checkboxgroup',
           messageKey: 'CFG_BRIEF_DAYS',
-          label: 'Wochentage',
-          options: WEEKDAYS,
+          label: t('cfgWeekdays'),
+          options: t('weekdaysMonFirst'),
           defaultValue: lib.maskToDays(settings.briefDays)
         }
       ]
@@ -84,20 +121,20 @@ function buildConfig(calendars, settings, loggedIn) {
     {
       type: 'section',
       items: [
-        { type: 'heading', defaultValue: 'Konto' },
+        { type: 'heading', defaultValue: t('cfgAccount') },
         {
           type: 'text',
-          defaultValue: loggedIn ? 'Angemeldet.' : 'Nicht angemeldet. Die Anmeldung startet auf der Uhr.'
+          defaultValue: loggedIn ? t('cfgLoggedIn') : t('cfgLoggedOut')
         },
         {
           type: 'toggle',
           messageKey: 'CFG_LOGOUT',
-          label: 'Abmelden (Tokens löschen)',
+          label: t('cfgLogout'),
           defaultValue: false
         }
       ]
     },
-    { type: 'submit', defaultValue: 'Speichern' }
+    { type: 'submit', defaultValue: t('cfgSave') }
   ];
 }
 
@@ -107,6 +144,13 @@ function value(result, key, fallback) {
   var v = result[key];
   if (v && typeof v === 'object' && v.hasOwnProperty('value')) v = v.value;
   return v === undefined || v === null ? fallback : v;
+}
+
+// Clay liefert Farben als Zahl (0xRRGGBB), ältere Versionen ggf. als Hex-String
+function colorValue(v, fallback) {
+  if (v === null || v === undefined || v === '') return fallback;
+  var n = typeof v === 'number' ? v : parseInt(String(v).replace(/^#|^0x/i, ''), 16);
+  return isNaN(n) ? fallback : (n & 0xFFFFFF);
 }
 
 // Überträgt das Clay-Ergebnis in unsere Settings. Gibt {settings, logout} zurück.
@@ -123,6 +167,11 @@ function applyResult(result, calendars, settings) {
   next.briefEnabled = !!value(result, 'CFG_BRIEF', next.briefEnabled);
   var t = lib.parseTime(value(result, 'CFG_BRIEF_TIME', next.briefTime));
   next.briefTime = (t.hour < 10 ? '0' : '') + t.hour + ':' + (t.minute < 10 ? '0' : '') + t.minute;
+  var lang = value(result, 'CFG_LANG', next.language);
+  next.language = (lang === 'de' || lang === 'en') ? lang : 'auto';
+  next.accentColor = colorValue(value(result, 'CFG_COLOR_ACCENT', null), next.accentColor);
+  next.textColor = colorValue(value(result, 'CFG_COLOR_TEXT', null), next.textColor);
+  next.bgColor = colorValue(value(result, 'CFG_COLOR_BG', null), next.bgColor);
   var days = value(result, 'CFG_BRIEF_DAYS', null);
   if (days && days.length === 7) next.briefDays = lib.daysToMask(days);
 

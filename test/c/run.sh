@@ -9,6 +9,6 @@ done
 echo "Syntax ok (emery, basalt, diorite)"
 OUT=$(mktemp)
 gcc -std=gnu99 -Wall -Itest/c/stub -DPBL_COLOR -Dtime=fake_time \
-  test/c/logic_test.c src/c/events.c src/c/settings.c -o "$OUT"
+  test/c/logic_test.c src/c/events.c src/c/settings.c src/c/i18n.c src/c/theme.c src/c/format.c -o "$OUT"
 "$OUT"
 rm -f "$OUT"

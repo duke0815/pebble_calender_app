@@ -1,5 +1,7 @@
 #include "ui_detail.h"
 #include "format.h"
+#include "i18n.h"
+#include "theme.h"
 
 #if defined(PBL_PLATFORM_EMERY)
   #define FONT_SMALL FONT_KEY_GOTHIC_18
@@ -33,6 +35,7 @@ static int16_t prv_add_text(int idx, const char *text, const char *font_key,
   text_layer_set_font(s_layers[idx], font);
   text_layer_set_overflow_mode(s_layers[idx], GTextOverflowModeWordWrap);
   text_layer_set_background_color(s_layers[idx], GColorClear);
+  text_layer_set_text_color(s_layers[idx], theme_text());
   scroll_layer_add_child(s_scroll, text_layer_get_layer(s_layers[idx]));
   return y + box.size.h;
 }
@@ -64,7 +67,7 @@ static void prv_window_load(Window *window) {
   for (int i = 0; i < TEXT_COUNT; i++) s_layers[i] = NULL;
   y = prv_add_text(0, s_date, FONT_SMALL, y, w);
   y = prv_add_text(1, s_time, FONT_TIME, y, w);
-  y = prv_add_text(2, s_event.title[0] ? s_event.title : "(ohne Titel)",
+  y = prv_add_text(2, s_event.title[0] ? s_event.title : tr(STR_NO_TITLE),
                    FONT_TITLE, y, w);
   if (s_event.location[0]) {
     y = prv_add_text(3, s_event.location, FONT_SMALL, y, w);
@@ -89,6 +92,7 @@ void ui_detail_show(const CalEvent *event) {
   if (s_window) return;
   s_event = *event;
   s_window = window_create();
+  window_set_background_color(s_window, theme_bg());
   window_set_window_handlers(s_window, (WindowHandlers) {
     .load = prv_window_load,
     .unload = prv_window_unload,

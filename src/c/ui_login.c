@@ -1,6 +1,7 @@
 #include <pebble.h>
 #include "ui_login.h"
 #include "protocol.h"
+#include "i18n.h"
 
 #if defined(PBL_PLATFORM_EMERY)
   #define FONT_SMALL FONT_KEY_GOTHIC_18
@@ -48,24 +49,24 @@ static void prv_window_load(Window *window) {
   int16_t w = bounds.size.w - 2 * PAD;
   int16_t y = 0;
 
-  s_title_layer = prv_text(root, GRect(0, y, bounds.size.w, H_SMALL + 4), "Anmeldung",
+  s_title_layer = prv_text(root, GRect(0, y, bounds.size.w, H_SMALL + 4), tr(STR_LOGIN_TITLE),
                            FONT_SMALL, GTextAlignmentCenter);
   text_layer_set_background_color(s_title_layer, PBL_IF_COLOR_ELSE(GColorOxfordBlue, GColorBlack));
   text_layer_set_text_color(s_title_layer, GColorWhite);
   y += H_SMALL + 8;
 
-  s_open_layer = prv_text(root, GRect(PAD, y, w, H_SMALL), "Am PC/Handy öffnen:", FONT_SMALL,
+  s_open_layer = prv_text(root, GRect(PAD, y, w, H_SMALL), tr(STR_LOGIN_OPEN), FONT_SMALL,
                           GTextAlignmentLeft);
   y += H_SMALL;
   s_url_layer = prv_text(root, GRect(PAD, y, w, H_URL), s_url, FONT_URL, GTextAlignmentLeft);
   y += H_URL;
-  s_enter_layer = prv_text(root, GRect(PAD, y, w, H_SMALL), "und Code eingeben:", FONT_SMALL,
+  s_enter_layer = prv_text(root, GRect(PAD, y, w, H_SMALL), tr(STR_LOGIN_ENTER), FONT_SMALL,
                            GTextAlignmentLeft);
   y += H_SMALL;
   s_code_layer = prv_text(root, GRect(PAD, y, w, H_CODE), s_code, FONT_CODE, GTextAlignmentCenter);
   text_layer_set_text_color(s_code_layer, PBL_IF_COLOR_ELSE(GColorCobaltBlue, GColorBlack));
   y += H_CODE + 4;
-  s_hint_layer = prv_text(root, GRect(PAD, y, w, bounds.size.h - y), "App bis zum Abschluss offen lassen.",
+  s_hint_layer = prv_text(root, GRect(PAD, y, w, bounds.size.h - y), tr(STR_LOGIN_HINT),
                           FONT_SMALL, GTextAlignmentLeft);
 }
 

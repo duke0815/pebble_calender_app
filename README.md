@@ -48,7 +48,7 @@ Alternativ die `build/*.pbw` aufs Handy kopieren und mit der Pebble-App öffnen.
 2. Am PC oder Handy `microsoft.com/devicelogin` öffnen, den Code eingeben und mit deinem Microsoft-Konto anmelden.
 3. **App auf der Uhr währenddessen offen lassen.** Danach erscheinen die Termine.
 
-Einstellungen (Kalender, Briefing) findest du in der Pebble-App am Handy unter den Einstellungen der Watchapp.
+Einstellungen (Kalender, Sprache Deutsch/Englisch, Farben, Briefing) findest du in der Pebble-App am Handy unter den Einstellungen der Watchapp.
 
 ## Bedienung
 

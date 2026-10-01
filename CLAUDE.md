@@ -31,7 +31,10 @@ src/c/protocol.h     Gemeinsame Konstanten (MSG_TYPE, STATUS_CODE, Längen)
 src/pkjs/index.js    PebbleKit JS: Ablaufsteuerung, Auth, Graph, Senden an Uhr
 src/pkjs/lib.js      Reine Logik (Zeiten, Filter, Kürzen, Fehlerklassifizierung) – mit Node testbar
 src/pkjs/config.js   Clay-Konfiguration (wird dynamisch aufgebaut)
-src/c/format.c/.h    Zeit-/Datumsformatierung (deutsch)
+src/c/format.c/.h    Zeit-/Datumsformatierung (DE/EN)
+src/c/i18n.c/.h      Texte der Uhr (Deutsch/Englisch), tr(STR_...)
+src/c/theme.c/.h     Farben aus den Settings + abgeleitete Kontrastfarben
+src/pkjs/i18n.js     Texte für Statusmeldungen und Einstellungsseite (Deutsch/Englisch)
 test/lib.test.js     Node-Tests für lib.js + config.js
 test/index.sim.js    Simulation von index.js (Pebble/XHR/localStorage gemockt)
 test/c/run.sh        C-Syntaxprüfung gegen Stub-pebble.h (emery/basalt/diorite) + native Logiktests
@@ -77,12 +80,18 @@ Clay-Config wird beim Öffnen (`showConfiguration`) **dynamisch** aus der gecach
 | Kalender | Checkbox-Gruppe (Default: Standardkalender) |
 | Ganztägige Termine anzeigen | Toggle (Default an) |
 | Abgelehnte Termine ausblenden | Toggle (Default an) |
+| Sprache | Auswahl: Automatisch (wie Handy, `navigator.language`) / Deutsch / English |
+| Akzentfarbe | Farbwähler (Default `0055AA` Kobaltblau): Datumsleiste + ausgewählter Termin |
+| Schriftfarbe | Farbwähler (Default `000000`) |
+| Hintergrundfarbe | Farbwähler (Default `FFFFFF`) |
 | Tägliches Briefing | Toggle (Default aus) |
 | Briefing-Uhrzeit | Zeit (Default 07:00) |
 | Briefing-Wochentage | Checkbox-Gruppe (Default Mo–Fr) |
 | Abmelden | Toggle → Tokens löschen |
 
-Settings, die die Uhr betreffen (Briefing an/aus, Uhrzeit, Wochentage), per AppMessage (`MSG_TYPE = 5`) an die Uhr schicken und dort persistieren. JS schickt sie zusätzlich zu Beginn jeder Synchronisierung.
+Clay füllt `meta.activeWatchInfo` nur beim `ready`-Event – bei der pro Öffnen neu erzeugten Instanz setzt `index.js` das selbst (sonst zeigt der Farbwähler nur Schwarz/Weiß). Keine `capabilities` in der Config verwenden (Clay kennt neuere Plattformen nicht).
+
+Settings, die die Uhr betreffen (Briefing an/aus, Uhrzeit, Wochentage, Sprache, Farben), per AppMessage (`MSG_TYPE = 5`) an die Uhr schicken und dort persistieren. JS schickt sie zusätzlich zu Beginn jeder Synchronisierung.
 
 ## AppMessage-Protokoll
 Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NACK-Retry (bis 4 Versuche, wachsende Pause).
@@ -103,6 +112,8 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 | `SET_BRIEF_ENABLED` | int | 0/1 |
 | `SET_BRIEF_HOUR` / `SET_BRIEF_MINUTE` | int | Briefing-Uhrzeit |
 | `SET_BRIEF_DAYS` | int | Bitmaske, Bit 0 = Sonntag … Bit 6 = Samstag (wie `tm_wday`); Mo–Fr = 62 |
+| `SET_LANG` | int | 0 = Deutsch, 1 = Englisch (in JS aus „Automatisch“ aufgelöst) |
+| `SET_COLOR_ACCENT` / `SET_COLOR_TEXT` / `SET_COLOR_BG` | int | 0xRRGGBB, auf der Uhr per `GColorFromHEX()` |
 
 - **Genau eine Synchronisierung pro App-Start:** JS synchronisiert beim `ready`-Event; die Uhr sendet beim Start nichts, sondern wartet (Statuszeile „Aktualisiere...“, Timeout) und zeigt bis dahin den Cache. Kein manuelles Aktualisieren, kein periodisches Nachladen.
 - `MSG_TYPE = 10` sendet die Uhr beim Blättern zu einem Tag außerhalb des Caches (`REQ_DAY` = Tag) und wenn das Briefing bei offener App fällig wird (`REQ_DAY` = 0). Sonst lädt JS nur nach dem Speichern der Einstellungen neu.
@@ -110,6 +121,8 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 - Die Uhr übernimmt eine neue Liste nur, wenn bei `MSG_TYPE = 2` alle `EVT_COUNT` Termine angekommen sind – sonst bleibt der alte Cache.
 - Jede Nachricht außer 4 schließt das Login-Fenster auf der Uhr.
 - Texte für die Uhr kein „…“-Zeichen verwenden, sondern `...` (Font-Abdeckung).
+- **Sprache:** Alle sichtbaren Texte zweisprachig – Uhr über `tr(STR_...)` in `i18n.c`, Handy über `i18n.t()` in `i18n.js`. Neue Texte immer in beiden Sprachen anlegen. Englisches Datum: „Thu Oct 1“, deutsches: „Do 01.10.“. Vor dem ersten Settings-Empfang nimmt die Uhr ihre Systemsprache (`i18n_get_system_locale()`).
+- **Farben:** Schrift auf der Akzentfarbe, Grau für vergangene Termine und die Statuszeile werden aus Helligkeit von Akzent/Hintergrund automatisch gewählt (`theme.c`). Schwarz-Weiß-Uhren ignorieren die Farben.
 
 ## Watchapp (C)
 - **Leiste oben:** immer das Datum des angezeigten Tages („Heute, Do 01.10.“, „Morgen, …“, „Sa 03.10.“). Darunter nur bei Bedarf eine schmale Statuszeile (Section-Header, sonst Höhe 0): „Aktualisiere...“, „Lade Tag...“, „Offline - Stand HH:MM“ oder Fehlertext. Im Normalfall kein „Stand“.

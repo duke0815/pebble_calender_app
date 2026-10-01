@@ -26,7 +26,8 @@ global.Pebble = {
       ok({});
     }, 1);
   },
-  openURL: function(url) { global.openedUrl = url; }
+  openURL: function(url) { global.openedUrl = url; },
+  getActiveWatchInfo: function() { return { platform: 'emery', firmware: { major: 4, minor: 9 } }; }
 };
 function fire(name, e) { (listeners[name] || []).forEach(function(fn) { fn(e || {}); }); }
 
@@ -88,7 +89,7 @@ global.XMLHttpRequest.prototype = {
 var origLoad = Module._load;
 Module._load = function(request) {
   if (request === 'pebble-clay') {
-    var Clay = function(config) { this.config = config; };
+    var Clay = function(config) { this.config = config; this.meta = { activeWatchInfo: null }; };
     Clay.prototype.generateUrl = function() { return 'data:clay'; };
     Clay.prototype.getSettings = function(r) { return JSON.parse(decodeURIComponent(r)); };
     return Clay;
@@ -153,7 +154,8 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
         CFG_CALENDARS: { value: [true] },
         CFG_ALLDAY: { value: true }, CFG_HIDE_DECLINED: { value: true }, CFG_BRIEF: { value: true },
         CFG_BRIEF_TIME: { value: '06:30' }, CFG_BRIEF_DAYS: { value: [true, true, true, true, true, false, false] },
-        CFG_LOGOUT: { value: false }
+        CFG_LOGOUT: { value: false },
+        CFG_LANG: { value: 'en' }, CFG_COLOR_ACCENT: { value: 0xAA0000 }
       }));
       fire('webviewclosed', { response: response });
       waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; }); }, 2000, function() {
@@ -163,6 +165,11 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
         assert.strictEqual(settingsMsg.SET_BRIEF_MINUTE, 30);
         assert.strictEqual(settingsMsg.SET_BRIEF_DAYS, 62);
         assert.strictEqual(settingsMsg.SET_MODE, undefined);
+        assert.strictEqual(settingsMsg.SET_LANG, 1);
+        assert.strictEqual(settingsMsg.SET_COLOR_ACCENT, 0xAA0000);
+        assert.strictEqual(settingsMsg.SET_COLOR_BG, 0xFFFFFF);
+        var statusMsg = sent.filter(function(m) { return m.MSG_TYPE === 3; })[0];
+        assert.strictEqual(statusMsg.STATUS_TEXT, 'Updating...');
         assert.ok(requests.some(function(r) { return /\/me\/calendars\/cal1\/calendarView$/.test(r); }),
                   'ausgewählter Kalender wird abgefragt');
         // Blättern: zwei Tage schnell hintereinander anfordern
