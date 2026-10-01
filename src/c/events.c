@@ -1,26 +1,33 @@
 #include "events.h"
-#include "settings.h"
 
-#define CACHE_VERSION 1
+#define CACHE_VERSION 2
 
-#define PERSIST_KEY_VERSION   1
-#define PERSIST_KEY_COUNT     2
-#define PERSIST_KEY_LAST_SYNC 3
-#define PERSIST_KEY_EVENT_0   100
+#define PERSIST_KEY_VERSION    1
+#define PERSIST_KEY_COUNT      2
+#define PERSIST_KEY_LAST_SYNC  3
+#define PERSIST_KEY_CACHE_DAY  5
+#define PERSIST_KEY_CACHE_DAYS 6
+#define PERSIST_KEY_EVENT_0    100
 
-static CalEvent s_events[MAX_EVENTS];
-static int s_count;
+// Cache: heute + morgen (persistent)
+static CalEvent s_cache[MAX_CACHE_EVENTS];
+static int s_cache_count;
+static time_t s_cache_day;
+static int s_cache_days;
 static time_t s_last_sync;
 
-static CalEvent s_incoming[MAX_EVENTS];
+// Tagespuffer: ein beliebiger anderer Tag (nur RAM)
+static CalEvent s_day[MAX_DAY_EVENTS];
+static int s_day_count;
+static time_t s_day_key;
+
+static CalEvent s_incoming[MAX_CACHE_EVENTS];
 static uint32_t s_incoming_mask;  // Bit i = Termin i empfangen
 
 // Ansicht
-static uint8_t s_view_idx[MAX_EVENTS];
+static time_t s_view_day;
+static const CalEvent *s_view[MAX_DAY_EVENTS];
 static uint8_t s_view_count;
-static uint8_t s_section_first[MAX_EVENTS + 1];  // erster Ansichts-Index je Section
-static time_t s_section_day[MAX_EVENTS];
-static uint8_t s_section_count;
 
 time_t time_make_local(time_t base, int day_offset, int hour, int minute) {
   struct tm tm = *localtime(&base);
@@ -42,43 +49,47 @@ time_t time_day_start(time_t t) {
   return time_make_local(t, 0, 0, 0);
 }
 
-static time_t prv_next_day_start(time_t day_start) {
-  // +26 h und abrunden: robust gegen Sommer-/Winterzeit
-  return time_day_start(day_start + 26 * 60 * 60);
-}
+// ---------------------------------------------------------------------------
+// Cache
 
 void events_load_cache(void) {
-  s_count = 0;
+  s_cache_count = 0;
+  s_cache_day = 0;
+  s_cache_days = 0;
   s_last_sync = 0;
   if (persist_read_int(PERSIST_KEY_VERSION) != CACHE_VERSION) {
     return;
   }
   int count = persist_read_int(PERSIST_KEY_COUNT);
-  if (count < 0 || count > MAX_EVENTS) {
+  if (count < 0 || count > MAX_CACHE_EVENTS) {
     return;
   }
   for (int i = 0; i < count; i++) {
-    if (persist_read_data(PERSIST_KEY_EVENT_0 + i, &s_events[i], sizeof(CalEvent)) != (int)sizeof(CalEvent)) {
+    if (persist_read_data(PERSIST_KEY_EVENT_0 + i, &s_cache[i], sizeof(CalEvent)) != (int)sizeof(CalEvent)) {
       return;  // Cache unvollstaendig -> verwerfen
     }
-    s_events[i].title[TITLE_LEN - 1] = '\0';
-    s_events[i].location[LOCATION_LEN - 1] = '\0';
+    s_cache[i].title[TITLE_LEN - 1] = '\0';
+    s_cache[i].location[LOCATION_LEN - 1] = '\0';
   }
-  s_count = count;
+  s_cache_count = count;
+  s_cache_day = persist_read_int(PERSIST_KEY_CACHE_DAY);
+  s_cache_days = persist_read_int(PERSIST_KEY_CACHE_DAYS);
   s_last_sync = persist_read_int(PERSIST_KEY_LAST_SYNC);
 }
 
 static void prv_save_cache(void) {
   persist_write_int(PERSIST_KEY_VERSION, CACHE_VERSION);
-  for (int i = 0; i < s_count; i++) {
-    persist_write_data(PERSIST_KEY_EVENT_0 + i, &s_events[i], sizeof(CalEvent));
+  for (int i = 0; i < s_cache_count; i++) {
+    persist_write_data(PERSIST_KEY_EVENT_0 + i, &s_cache[i], sizeof(CalEvent));
   }
-  for (int i = s_count; i < MAX_EVENTS; i++) {
+  for (int i = s_cache_count; i < MAX_CACHE_EVENTS; i++) {
     if (persist_exists(PERSIST_KEY_EVENT_0 + i)) {
       persist_delete(PERSIST_KEY_EVENT_0 + i);
     }
   }
-  persist_write_int(PERSIST_KEY_COUNT, s_count);
+  persist_write_int(PERSIST_KEY_COUNT, s_cache_count);
+  persist_write_int(PERSIST_KEY_CACHE_DAY, (int32_t)s_cache_day);
+  persist_write_int(PERSIST_KEY_CACHE_DAYS, s_cache_days);
   persist_write_int(PERSIST_KEY_LAST_SYNC, (int32_t)s_last_sync);
 }
 
@@ -87,7 +98,7 @@ time_t events_last_sync(void) {
 }
 
 void events_receive(int index, const CalEvent *event) {
-  if (index < 0 || index >= MAX_EVENTS) {
+  if (index < 0 || index >= MAX_CACHE_EVENTS) {
     return;
   }
   if (index == 0) {
@@ -97,91 +108,94 @@ void events_receive(int index, const CalEvent *event) {
   s_incoming_mask |= (1u << index);
 }
 
-bool events_commit(int count) {
-  if (count > MAX_EVENTS) {
-    count = MAX_EVENTS;
+bool events_commit(int count, time_t list_day, int list_days) {
+  int limit = list_days >= 2 ? MAX_CACHE_EVENTS : MAX_DAY_EVENTS;
+  if (count > limit) {
+    count = limit;
   }
-  uint32_t expected = (count == 0) ? 0 : ((1u << count) - 1);
-  if (count < 0 || (s_incoming_mask & expected) != expected) {
-    APP_LOG(APP_LOG_LEVEL_WARNING, "Liste unvollstaendig, Cache bleibt");
+  uint32_t expected = (count <= 0) ? 0 : ((1u << count) - 1);
+  if (count < 0 || list_day == 0 || (s_incoming_mask & expected) != expected) {
+    APP_LOG(APP_LOG_LEVEL_WARNING, "Liste unvollstaendig, verworfen");
     s_incoming_mask = 0;
     return false;
   }
-  memcpy(s_events, s_incoming, sizeof(CalEvent) * count);
-  s_count = count;
-  s_last_sync = time(NULL);
+  if (list_days >= 2) {
+    memcpy(s_cache, s_incoming, sizeof(CalEvent) * count);
+    s_cache_count = count;
+    s_cache_day = list_day;
+    s_cache_days = list_days;
+    s_last_sync = time(NULL);
+    prv_save_cache();
+  } else {
+    memcpy(s_day, s_incoming, sizeof(CalEvent) * count);
+    s_day_count = count;
+    s_day_key = list_day;
+  }
   s_incoming_mask = 0;
-  prv_save_cache();
   return true;
 }
 
 // ---------------------------------------------------------------------------
 // Ansicht
 
+static bool prv_cache_covers(time_t day) {
+  if (s_cache_days <= 0 || s_cache_day == 0) return false;
+  time_t cache_end = time_make_local(s_cache_day, s_cache_days, 0, 0);
+  return day >= s_cache_day && day < cache_end;
+}
+
+void events_set_view_day(time_t day) {
+  s_view_day = time_day_start(day);
+  events_rebuild_view();
+}
+
+time_t events_view_day(void) {
+  return s_view_day;
+}
+
+bool events_view_available(void) {
+  return prv_cache_covers(s_view_day) || s_day_key == s_view_day;
+}
+
 void events_rebuild_view(void) {
-  Settings *settings = settings_get();
-  time_t now = time(NULL);
-  time_t today = time_day_start(now);
-  time_t tomorrow = prv_next_day_start(today);
+  time_t day = s_view_day;
+  time_t next_day = time_make_local(day, 1, 0, 0);
+  const CalEvent *source;
+  int count;
+  if (prv_cache_covers(day)) {
+    source = s_cache;
+    count = s_cache_count;
+  } else if (s_day_key == day) {
+    source = s_day;
+    count = s_day_count;
+  } else {
+    source = NULL;
+    count = 0;
+  }
 
   s_view_count = 0;
-  s_section_count = 0;
-
-  for (int i = 0; i < s_count; i++) {
-    const CalEvent *e = &s_events[i];
-    bool visible;
-    if (settings->mode == MODE_TODAY) {
-      visible = e->start < tomorrow && e->end > today;
-    } else {
-      visible = e->end > now && s_view_count < settings->count;
+  for (int i = 0; i < count && s_view_count < MAX_DAY_EVENTS; i++) {
+    const CalEvent *e = &source[i];
+    if (e->start < next_day && e->end > day) {
+      s_view[s_view_count++] = e;
     }
-    if (!visible) {
-      continue;
-    }
-    time_t shown_start = e->start > today ? e->start : today;
-    time_t day = time_day_start(shown_start);
-    if (s_section_count == 0 || s_section_day[s_section_count - 1] != day) {
-      s_section_day[s_section_count] = day;
-      s_section_first[s_section_count] = s_view_count;
-      s_section_count++;
-    }
-    s_view_idx[s_view_count++] = i;
   }
-  s_section_first[s_section_count] = s_view_count;
 }
 
-uint16_t events_view_num_sections(void) {
-  return s_section_count;
+uint16_t events_view_count(void) {
+  return s_view_count;
 }
 
-uint16_t events_view_num_rows(uint16_t section) {
-  if (section >= s_section_count) {
-    return 0;
-  }
-  return s_section_first[section + 1] - s_section_first[section];
+const CalEvent *events_view_get(uint16_t row) {
+  return row < s_view_count ? s_view[row] : NULL;
 }
 
-const CalEvent *events_view_get(uint16_t section, uint16_t row) {
-  if (section >= s_section_count || row >= events_view_num_rows(section)) {
-    return NULL;
-  }
-  return &s_events[s_view_idx[s_section_first[section] + row]];
-}
-
-time_t events_view_section_day(uint16_t section) {
-  return section < s_section_count ? s_section_day[section] : 0;
-}
-
-bool events_view_first_upcoming(uint16_t *section, uint16_t *row) {
+bool events_view_first_upcoming(uint16_t *row) {
   time_t now = time(NULL);
-  for (uint16_t s = 0; s < s_section_count; s++) {
-    for (uint16_t r = 0; r < events_view_num_rows(s); r++) {
-      const CalEvent *e = events_view_get(s, r);
-      if (e->end > now) {
-        *section = s;
-        *row = r;
-        return true;
-      }
+  for (uint16_t r = 0; r < s_view_count; r++) {
+    if (s_view[r]->end > now) {
+      *row = r;
+      return true;
     }
   }
   return false;

@@ -42,22 +42,20 @@ static void prv_interaction(void) {
   if (s_callbacks.interaction) s_callbacks.interaction();
 }
 
-// Sections: Termin-Tage, oder eine Info-Section, wenn nichts sichtbar ist
-static bool prv_is_info_section(uint16_t section) {
-  return events_view_num_sections() == 0 && section == 0;
+// Eine Section: der angezeigte Tag. Ohne Termine eine Info-Zeile.
+static bool prv_is_info(void) {
+  return events_view_count() == 0;
 }
 
 // ---------------------------------------------------------------------------
 // MenuLayer-Callbacks
 
 static uint16_t prv_num_sections(MenuLayer *menu, void *ctx) {
-  uint16_t n = events_view_num_sections();
-  return n > 0 ? n : 1;
+  return 1;
 }
 
 static uint16_t prv_num_rows(MenuLayer *menu, uint16_t section, void *ctx) {
-  if (prv_is_info_section(section)) return 1;
-  return events_view_num_rows(section);
+  return prv_is_info() ? 1 : events_view_count();
 }
 
 static int16_t prv_header_height(MenuLayer *menu, uint16_t section, void *ctx) {
@@ -65,8 +63,8 @@ static int16_t prv_header_height(MenuLayer *menu, uint16_t section, void *ctx) {
 }
 
 static int16_t prv_cell_height(MenuLayer *menu, MenuIndex *index, void *ctx) {
-  if (prv_is_info_section(index->section)) return INFO_ROW_H;
-  const CalEvent *e = events_view_get(index->section, index->row);
+  if (prv_is_info()) return INFO_ROW_H;
+  const CalEvent *e = events_view_get(index->row);
   int16_t h = 2 * PAD_Y + H_TIME + H_TITLE;
   if (e && e->location[0]) h += H_LOC;
   return h;
@@ -74,18 +72,21 @@ static int16_t prv_cell_height(MenuLayer *menu, MenuIndex *index, void *ctx) {
 
 static void prv_draw_header(GContext *ctx, const Layer *cell, uint16_t section, void *data) {
   GRect bounds = layer_get_bounds(cell);
-  char text[32];
-  if (prv_is_info_section(section)) {
-    format_day(time_day_start(time(NULL)), text, sizeof(text));
-  } else {
-    format_day(events_view_section_day(section), text, sizeof(text));
-  }
+  char day[24];
+  char text[40];
+  format_day(events_view_day(), day, sizeof(day));
+#if defined(PBL_TOUCH)
+  // Hinweis auf Wischen links/rechts
+  snprintf(text, sizeof(text), "< %s >", day);
+#else
+  snprintf(text, sizeof(text), "%s", day);
+#endif
   graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorLightGray, GColorBlack));
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   graphics_context_set_text_color(ctx, PBL_IF_COLOR_ELSE(GColorBlack, GColorWhite));
   graphics_draw_text(ctx, text, fonts_get_system_font(FONT_TIME),
                      GRect(PAD_X, 0, bounds.size.w - 2 * PAD_X, HEADER_H),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
 static void prv_draw_event(GContext *ctx, const Layer *cell, const CalEvent *e) {
@@ -124,20 +125,18 @@ static void prv_draw_info(GContext *ctx, const Layer *cell) {
 }
 
 static void prv_draw_row(GContext *ctx, const Layer *cell, MenuIndex *index, void *data) {
-  if (prv_is_info_section(index->section)) {
+  if (prv_is_info()) {
     prv_draw_info(ctx, cell);
-  } else {
-    const CalEvent *e = events_view_get(index->section, index->row);
-    if (e) prv_draw_event(ctx, cell, e);
+    return;
   }
+  const CalEvent *e = events_view_get(index->row);
+  if (e) prv_draw_event(ctx, cell, e);
 }
 
 static void prv_select(MenuLayer *menu, MenuIndex *index, void *data) {
   prv_interaction();
-  if (prv_is_info_section(index->section)) {
-    return;
-  }
-  const CalEvent *e = events_view_get(index->section, index->row);
+  if (prv_is_info()) return;
+  const CalEvent *e = events_view_get(index->row);
   if (e) ui_detail_show(e);
 }
 
@@ -212,12 +211,25 @@ void ui_main_reload(bool select_upcoming) {
   if (!s_menu_layer) return;
   menu_layer_reload_data(s_menu_layer);
   MenuIndex current = menu_layer_get_selected_index(s_menu_layer);
-  bool out_of_range = current.section >= prv_num_sections(s_menu_layer, NULL) ||
-                      current.row >= prv_num_rows(s_menu_layer, current.section, NULL);
+  bool out_of_range = current.row >= prv_num_rows(s_menu_layer, 0, NULL);
   if (select_upcoming || out_of_range) {
     MenuIndex index = { .section = 0, .row = 0 };
-    events_view_first_upcoming(&index.section, &index.row);
+    events_view_first_upcoming(&index.row);
     menu_layer_set_selected_index(s_menu_layer, index, MenuRowAlignTop, false);
+  }
+}
+
+bool ui_main_is_top(void) {
+  return s_window && window_stack_get_top_window() == s_window;
+}
+
+void ui_main_scroll(int rows) {
+  if (!s_menu_layer || rows == 0) return;
+  prv_interaction();
+  bool up = rows < 0;
+  int steps = up ? -rows : rows;
+  for (int i = 0; i < steps; i++) {
+    menu_layer_set_selected_next(s_menu_layer, up, MenuRowAlignCenter, i == steps - 1);
   }
 }
 

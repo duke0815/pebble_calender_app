@@ -94,18 +94,12 @@ function sendSettings(settings) {
     SET_BRIEF_ENABLED: settings.briefEnabled ? 1 : 0,
     SET_BRIEF_HOUR: t.hour,
     SET_BRIEF_MINUTE: t.minute,
-    SET_BRIEF_DAYS: settings.briefDays,
-    SET_MODE: settings.mode === 'next' ? 1 : 0,
-    SET_COUNT: settings.count
+    SET_BRIEF_DAYS: settings.briefDays
   });
 }
 
-function sendEvents(events) {
-  // Noch nicht zugestellte Termine einer älteren Liste verwerfen (außer der gerade gesendeten).
-  queue = queue.filter(function(item, i) {
-    var type = item.message.MSG_TYPE;
-    return (sending && i === 0) || (type !== MSG.EVENT && type !== MSG.END);
-  });
+// listDay: Epoch-Sekunden des ersten Tages, listDays: 2 = Cache (heute + morgen), 1 = ein Tag
+function sendEvents(events, listDay, listDays) {
   events.forEach(function(e, i) {
     enqueue({
       MSG_TYPE: MSG.EVENT,
@@ -118,7 +112,7 @@ function sendEvents(events) {
       EVT_LOCATION: e.location
     });
   });
-  enqueue({ MSG_TYPE: MSG.END, EVT_COUNT: events.length });
+  enqueue({ MSG_TYPE: MSG.END, EVT_COUNT: events.length, LIST_DAY: listDay, LIST_DAYS: listDays });
 }
 
 // --- HTTP -------------------------------------------------------------------
@@ -319,8 +313,7 @@ function fetchCalendars(token, callback) {
     });
 }
 
-function fetchEvents(token, settings, callback) {
-  var win = lib.queryWindow(settings.mode, new Date());
+function fetchEvents(token, settings, win, callback) {
   var query = '/calendarView?startDateTime=' + encodeURIComponent(win.start.toISOString()) +
               '&endDateTime=' + encodeURIComponent(win.end.toISOString()) +
               '&$select=' + EVENT_FIELDS + '&$orderby=start/dateTime&$top=50';
@@ -334,7 +327,7 @@ function fetchEvents(token, settings, callback) {
 
   function next() {
     if (i >= bases.length) {
-      callback(null, lib.selectEvents(all.map(lib.normalizeEvent), settings, new Date()));
+      callback(null, lib.selectEvents(all.map(lib.normalizeEvent), settings, win));
       return;
     }
     graphGetAll(bases[i] + query, token, [], function(status, items) {
@@ -376,22 +369,60 @@ function fetchEvents(token, settings, callback) {
 }
 
 // --- Synchronisierung -------------------------------------------------------
+// Aufträge werden nacheinander abgearbeitet: der Cache (heute + morgen) beim App-Start
+// und einzelne Tage beim Blättern auf der Uhr (nur der zuletzt angeforderte Tag zählt).
 
-var syncing = false;
+var busy = false;
+var busyIsCache = false;
+var pendingCache = false;
+var pendingDay = null;   // Epoch-Sekunden (lokale Mitternacht, wie von der Uhr geschickt)
 
-function sync() {
-  if (syncing) {
+// force: auch bei laufender Synchronisierung danach erneut laden (geänderte Einstellungen)
+function sync(force) {
+  if (busy && busyIsCache && !force) {
+    // Läuft bereits -> zusammenfassen (genau eine Synchronisierung pro Start)
     if (login) sendLoginCode();
     return;
   }
-  syncing = true;
+  pendingCache = true;
+  run();
+}
+
+function requestDay(day) {
+  pendingDay = day;
+  run();
+}
+
+function run() {
+  if (busy) return;
+  var isCache;
+  var listDay;
+  var win;
+  if (pendingCache) {
+    pendingCache = false;
+    isCache = true;
+    win = lib.queryWindow(new Date(), lib.CACHE_DAYS);
+    listDay = Math.floor(win.start.getTime() / 1000);
+  } else if (pendingDay !== null) {
+    isCache = false;
+    listDay = pendingDay;
+    pendingDay = null;
+    win = lib.queryWindow(new Date(listDay * 1000), 1);
+  } else {
+    return;
+  }
+  busy = true;
+  busyIsCache = isCache;
   var settings = getSettings();
-  sendSettings(settings);
-  sendStatus(STATUS.SYNCING, 'Aktualisiere...');
+  if (isCache) {
+    sendSettings(settings);
+    sendStatus(STATUS.SYNCING, 'Aktualisiere...');
+  }
 
   function done(err) {
-    syncing = false;
+    busy = false;
     if (err) sendStatus(err.code, err.text);
+    run();
   }
 
   getToken(function(err, token) {
@@ -399,14 +430,14 @@ function sync() {
       done(err);
       return;
     }
-    fetchEvents(token, settings, function(fetchErr, events) {
+    fetchEvents(token, settings, win, function(fetchErr, events) {
       if (fetchErr) {
         done(fetchErr);
         return;
       }
-      sendEvents(events);
+      sendEvents(events, listDay, isCache ? lib.CACHE_DAYS : 1);
       done(null);
-      if (Date.now() - getCalendars().fetched > CALENDAR_MAX_AGE_MS) {
+      if (isCache && Date.now() - getCalendars().fetched > CALENDAR_MAX_AGE_MS) {
         fetchCalendars(token);
       }
     });
@@ -475,11 +506,11 @@ Pebble.addEventListener('webviewclosed', function(e) {
     if (login) finishLogin({ code: STATUS.NEED_LOGIN, text: 'Abgemeldet.' });
     clearAuth();
     sendSettings(applied.settings);
-    sendEvents([]);
+    sendEvents([], Math.floor(lib.queryWindow(new Date(), 1).start.getTime() / 1000), lib.CACHE_DAYS);
     sendStatus(STATUS.NEED_LOGIN, 'Abgemeldet. App neu öffnen zum Anmelden.');
     return;
   }
-  sync();
+  sync(true);
 });
 
 // --- Nachrichten von der Uhr ------------------------------------------------
@@ -492,9 +523,14 @@ function payloadValue(payload, name) {
 
 Pebble.addEventListener('appmessage', function(e) {
   var type = payloadValue(e.payload || {}, 'MSG_TYPE');
-  // REQUEST kommt nur noch, wenn das Briefing bei bereits offener App fällig wird.
+  // REQ_DAY = 0: Cache neu laden (Briefing bei offener App), sonst einzelner Tag (Blättern)
   if (type === MSG.REQUEST) {
-    sync();
+    var day = payloadValue(e.payload || {}, 'REQ_DAY');
+    if (day) {
+      requestDay(day);
+    } else {
+      sync();
+    }
   }
 });
 

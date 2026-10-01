@@ -51,56 +51,83 @@ static void add(int i, time_t start, time_t end, int all_day, const char *title)
 
 int main(void) {
   setenv("TZ", "Europe/Vienna", 1); tzset();
-  printf("sizeof(CalEvent)=%zu, Cache gesamt=%zu Byte\n", sizeof(CalEvent), sizeof(CalEvent) * MAX_EVENTS);
+  printf("sizeof(CalEvent)=%zu, Cache gesamt=%zu Byte\n", sizeof(CalEvent), sizeof(CalEvent) * MAX_CACHE_EVENTS);
   assert(sizeof(CalEvent) <= 256);
-  assert(sizeof(CalEvent) * MAX_EVENTS <= 2048);
+  assert(sizeof(CalEvent) * MAX_CACHE_EVENTS <= 2600);
 
   s_now = local(2026, 10, 1, 10, 0);  // Do 01.10.2026 10:00
   settings_load();
+  events_load_cache();
+  events_set_view_day(s_now);
+  assert(!events_view_available());   // noch kein Cache
 
-  // Liste: Ganztägig seit gestern, vorbei heute, später heute, morgen
+  time_t today = local(2026, 10, 1, 0, 0);
+  time_t tomorrow = local(2026, 10, 2, 0, 0);
+
+  // Cache-Liste (heute + morgen): Ganztägig seit gestern, vorbei, später, morgen
   add(0, local(2026, 9, 30, 0, 0), local(2026, 10, 2, 0, 0), 1, "Messe");
   add(1, local(2026, 10, 1, 8, 0), local(2026, 10, 1, 9, 0), 0, "Frueh");
   add(2, local(2026, 10, 1, 14, 0), local(2026, 10, 1, 15, 0), 0, "Spaeter");
   add(3, local(2026, 10, 2, 9, 0), local(2026, 10, 2, 10, 0), 0, "Morgen");
-  assert(!events_commit(5));        // unvollständig -> verworfen
+  assert(!events_commit(5, today, 2));        // unvollständig -> verworfen
   add(0, local(2026, 9, 30, 0, 0), local(2026, 10, 2, 0, 0), 1, "Messe");
   add(1, local(2026, 10, 1, 8, 0), local(2026, 10, 1, 9, 0), 0, "Frueh");
   add(2, local(2026, 10, 1, 14, 0), local(2026, 10, 1, 15, 0), 0, "Spaeter");
   add(3, local(2026, 10, 2, 9, 0), local(2026, 10, 2, 10, 0), 0, "Morgen");
-  assert(events_commit(4));
+  assert(events_commit(4, today, 2));
 
-  // Modus heute: eine Section, 3 Zeilen; erster anstehender = Messe (läuft noch)
+  // Heute: 3 Termine, erster anstehender = Messe (läuft noch)
   events_rebuild_view();
-  assert(events_view_num_sections() == 1);
-  assert(events_view_num_rows(0) == 3);
-  assert(events_view_section_day(0) == local(2026, 10, 1, 0, 0));
-  uint16_t s, r;
-  assert(events_view_first_upcoming(&s, &r) && s == 0 && r == 0);
+  assert(events_view_available());
+  assert(events_view_count() == 3);
+  uint16_t r;
+  assert(events_view_first_upcoming(&r) && r == 0);
 
-  // Modus nächste N=2: läuft/kommt -> Messe, Spaeter
-  settings_get()->mode = MODE_NEXT; settings_get()->count = 2;
+  // Morgen kommt aus dem Cache
+  events_set_view_day(tomorrow);
+  assert(events_view_available() && events_view_count() == 1);
+  assert(strcmp(events_view_get(0)->title, "Morgen") == 0);
+
+  // Übermorgen fehlt -> Tagesliste vom Handy (nur RAM)
+  time_t day3 = local(2026, 10, 3, 0, 0);
+  events_set_view_day(day3);
+  assert(!events_view_available());
+  add(0, local(2026, 10, 3, 11, 0), local(2026, 10, 3, 12, 0), 0, "Samstag");
+  assert(events_commit(1, day3, 1));
   events_rebuild_view();
-  assert(events_view_num_sections() == 1);
-  assert(strcmp(events_view_get(0, 1)->title, "Spaeter") == 0);
-  settings_get()->count = 10;
+  assert(events_view_available() && events_view_count() == 1);
+  // Gestern: ebenfalls Tagesliste, ersetzt den Tagespuffer
+  time_t yesterday = local(2026, 9, 30, 0, 0);
+  events_set_view_day(yesterday);
+  assert(!events_view_available());
+  assert(events_commit(0, yesterday, 1));      // leerer Tag
   events_rebuild_view();
-  assert(events_view_num_sections() == 2);  // Heute + Morgen
-  assert(strcmp(events_view_get(1, 0)->title, "Morgen") == 0);
+  assert(events_view_available() && events_view_count() == 0);
+  // Cache unverändert
+  events_set_view_day(today);
+  assert(events_view_count() == 3);
+
+  // Max. 12 Termine pro Tag in der Ansicht
+  for (int i = 0; i < 14; i++) add(i, local(2026, 10, 5, 8, i), local(2026, 10, 5, 9, i), 0, "X");
+  time_t day5 = local(2026, 10, 5, 0, 0);
+  assert(events_commit(14, day5, 1));          // auf MAX_DAY_EVENTS gekürzt
+  events_set_view_day(day5);
+  assert(events_view_count() == MAX_DAY_EVENTS);
 
   // Cache neu laden
   events_load_cache();
   assert(events_last_sync() == s_now);
-  settings_get()->mode = MODE_TODAY;
-  events_rebuild_view();
-  assert(events_view_num_rows(0) == 3);
+  events_set_view_day(today);
+  assert(events_view_count() == 3);
 
-  // Nächster Tag aus dem Cache: nur "Morgen"
+  // Nächster Tag (Fr) mit Cache vom Donnerstag: "morgen" ist jetzt heute
   s_now = local(2026, 10, 2, 7, 0);
-  events_rebuild_view();
-  // Messe endet exklusiv am 02.10. 00:00 -> am Freitag nur noch "Morgen"
-  assert(events_view_num_sections() == 1 && events_view_num_rows(0) == 1);
-  assert(strcmp(events_view_get(0, 0)->title, "Morgen") == 0);
+  events_set_view_day(s_now);
+  assert(events_view_available() && events_view_count() == 1);
+  assert(strcmp(events_view_get(0)->title, "Morgen") == 0);
+  // Samstag ist nicht im Cache
+  events_set_view_day(day3);
+  assert(!events_view_available());
 
   // Briefing: Do 01.10. 10:00, 07:00 Mo-Fr -> Fr 02.10. 07:00
   s_now = local(2026, 10, 1, 10, 0);

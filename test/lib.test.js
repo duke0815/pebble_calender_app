@@ -69,9 +69,9 @@ function ev(start, end, title, extra) {
   return e;
 }
 
-test('selectEvents heute: Zeitraum heute+morgen, sortiert, Filter', function() {
-  var now = new Date(2026, 9, 1, 10, 0);
-  var settings = lib.mergeSettings({ mode: 'today' });
+test('selectEvents Cache: Zeitraum heute+morgen, sortiert, Filter', function() {
+  var settings = lib.mergeSettings({});
+  var win = lib.queryWindow(new Date(2026, 9, 1, 10, 0), lib.CACHE_DAYS);
   var list = lib.selectEvents([
     ev(local(2026, 10, 1, 14), local(2026, 10, 1, 15), 'B'),
     ev(local(2026, 10, 1, 8), local(2026, 10, 1, 9), 'A (vorbei, bleibt)'),
@@ -80,45 +80,53 @@ test('selectEvents heute: Zeitraum heute+morgen, sortiert, Filter', function() {
     ev(local(2026, 10, 1, 12), local(2026, 10, 1, 13), 'Abgelehnt', { declined: true }),
     ev(local(2026, 10, 1), local(2026, 10, 2), 'Ganztägig', { allDay: true }),
     ev(local(2026, 10, 1, 14), local(2026, 10, 1, 15), 'B')  // Duplikat aus 2. Kalender
-  ], settings, now);
+  ], settings, win);
   assert.deepStrictEqual(list.map(function(e) { return e.title; }),
     ['Ganztägig', 'A (vorbei, bleibt)', 'B', 'Morgen']);
 });
 
-test('selectEvents heute: Ganztägige ausblenden, Abgelehnte zeigen', function() {
-  var now = new Date(2026, 9, 1, 10, 0);
-  var settings = lib.mergeSettings({ mode: 'today', showAllDay: false, hideDeclined: false });
+test('selectEvents: Ganztägige ausblenden, Abgelehnte zeigen', function() {
+  var settings = lib.mergeSettings({ showAllDay: false, hideDeclined: false });
   var list = lib.selectEvents([
     ev(local(2026, 10, 1), local(2026, 10, 2), 'Ganztägig', { allDay: true }),
     ev(local(2026, 10, 1, 12), local(2026, 10, 1, 13), 'Abgelehnt', { declined: true })
-  ], settings, now);
+  ], settings, lib.queryWindow(new Date(2026, 9, 1), 1));
   assert.deepStrictEqual(list.map(function(e) { return e.title; }), ['Abgelehnt']);
 });
 
-test('selectEvents nächste N: nur zukünftige/laufende, auf N gekürzt', function() {
-  var now = new Date(2026, 9, 1, 10, 0);
-  var settings = lib.mergeSettings({ mode: 'next', count: 2 });
-  var list = lib.selectEvents([
-    ev(local(2026, 10, 1, 8), local(2026, 10, 1, 9), 'vorbei'),
-    ev(local(2026, 10, 1, 9, 30), local(2026, 10, 1, 10, 30), 'läuft'),
-    ev(local(2026, 10, 5, 9), local(2026, 10, 5, 10), 'nächste Woche'),
-    ev(local(2026, 10, 6, 9), local(2026, 10, 6, 10), 'zu viel')
-  ], settings, now);
-  assert.deepStrictEqual(list.map(function(e) { return e.title; }), ['läuft', 'nächste Woche']);
+test('selectEvents einzelner Tag: max. 12, nur dieser Tag', function() {
+  var many = [];
+  for (var i = 0; i < 20; i++) many.push(ev(local(2026, 10, 5, 8) + i * 60, local(2026, 10, 5, 9) + i * 60, 'T' + i));
+  many.push(ev(local(2026, 10, 6, 8), local(2026, 10, 6, 9), 'Nächster Tag'));
+  var list = lib.selectEvents(many, lib.mergeSettings({}), lib.queryWindow(new Date(2026, 9, 5), 1));
+  assert.strictEqual(list.length, lib.MAX_DAY_EVENTS);
+  assert.ok(list.every(function(e) { return e.title !== 'Nächster Tag'; }));
 });
 
-test('selectEvents: nie mehr als MAX_EVENTS', function() {
-  var now = new Date(2026, 9, 1, 0, 0);
+test('selectEvents Cache: heute max. 12, morgen füllt bis 16 auf', function() {
   var many = [];
-  for (var i = 0; i < 40; i++) many.push(ev(local(2026, 10, 1, 8) + i * 60, local(2026, 10, 1, 9) + i * 60, 'T' + i));
-  assert.strictEqual(lib.selectEvents(many, lib.mergeSettings({}), now).length, lib.MAX_EVENTS);
+  for (var i = 0; i < 14; i++) many.push(ev(local(2026, 10, 1, 8) + i * 60, local(2026, 10, 1, 9) + i * 60, 'H' + i));
+  for (i = 0; i < 8; i++) many.push(ev(local(2026, 10, 2, 8) + i * 60, local(2026, 10, 2, 9) + i * 60, 'M' + i));
+  var list = lib.selectEvents(many, lib.mergeSettings({}), lib.queryWindow(new Date(2026, 9, 1, 10), 2));
+  assert.strictEqual(list.length, lib.MAX_CACHE_EVENTS);
+  assert.strictEqual(list.filter(function(e) { return e.title[0] === 'H'; }).length, 12);
+  assert.strictEqual(list.filter(function(e) { return e.title[0] === 'M'; }).length, 4);
 });
 
 test('queryWindow über Zeitumstellung (25.10.2026)', function() {
-  var w = lib.queryWindow('today', new Date(2026, 9, 24, 22, 0));
+  var w = lib.queryWindow(new Date(2026, 9, 24, 22, 0), 2);
   assert.strictEqual(w.start.getHours(), 0);
   assert.strictEqual(w.end.getHours(), 0);
   assert.strictEqual(w.end.getDate(), 26);
+});
+
+test('normalizeEvent: lange Titel bis 80 Zeichen / 95 Byte', function() {
+  var e = lib.normalizeEvent({ subject: 'Ü'.repeat(100), start: { dateTime: '2026-10-01T07:00:00' },
+                               end: { dateTime: '2026-10-01T08:00:00' } });
+  assert.ok(Buffer.byteLength(e.title, 'utf8') <= 95);
+  var a = lib.normalizeEvent({ subject: 'a'.repeat(100), start: { dateTime: '2026-10-01T07:00:00' },
+                               end: { dateTime: '2026-10-01T08:00:00' } });
+  assert.strictEqual(a.title.length, 80);
 });
 
 test('classifyAuthError', function() {
@@ -144,8 +152,6 @@ test('Clay-Konfiguration: Defaults und Rückweg', function() {
 
   var result = {
     CFG_CALENDARS: { value: [true, true] },
-    CFG_MODE: { value: 'next' },
-    CFG_COUNT: { value: '5' },
     CFG_ALLDAY: { value: false },
     CFG_HIDE_DECLINED: { value: true },
     CFG_BRIEF: { value: true },
@@ -155,8 +161,6 @@ test('Clay-Konfiguration: Defaults und Rückweg', function() {
   };
   var applied = config.applyResult(result, cals, settings);
   assert.deepStrictEqual(applied.settings.calendars, ['a', 'b']);
-  assert.strictEqual(applied.settings.mode, 'next');
-  assert.strictEqual(applied.settings.count, 5);
   assert.strictEqual(applied.settings.showAllDay, false);
   assert.strictEqual(applied.settings.briefEnabled, true);
   assert.strictEqual(applied.settings.briefTime, '06:45');

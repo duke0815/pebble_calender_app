@@ -58,6 +58,7 @@ void window_set_window_handlers(Window *window, WindowHandlers handlers);
 Layer *window_get_root_layer(const Window *window);
 void window_stack_push(Window *window, bool animated);
 bool window_stack_remove(Window *window, bool animated);
+Window *window_stack_get_top_window(void);
 void window_stack_pop_all(const bool animated);
 
 GRect layer_get_bounds(const Layer *layer);
@@ -81,6 +82,8 @@ void scroll_layer_add_child(ScrollLayer *scroll_layer, Layer *child);
 void scroll_layer_set_click_config_onto_window(ScrollLayer *scroll_layer, Window *window);
 void scroll_layer_set_content_size(ScrollLayer *scroll_layer, GSize size);
 void scroll_layer_set_shadow_hidden(ScrollLayer *scroll_layer, bool hidden);
+void scroll_layer_set_content_offset(ScrollLayer *scroll_layer, GPoint offset, bool animated);
+GPoint scroll_layer_get_content_offset(ScrollLayer *scroll_layer);
 
 typedef struct { uint16_t section; uint16_t row; } MenuIndex;
 typedef enum { MenuRowAlignNone, MenuRowAlignCenter, MenuRowAlignTop, MenuRowAlignBottom } MenuRowAlign;
@@ -111,6 +114,7 @@ void menu_layer_set_click_config_onto_window(MenuLayer *menu_layer, Window *wind
 void menu_layer_reload_data(MenuLayer *menu_layer);
 MenuIndex menu_layer_get_selected_index(const MenuLayer *menu_layer);
 void menu_layer_set_selected_index(MenuLayer *menu_layer, MenuIndex index, MenuRowAlign scroll_align, bool animated);
+void menu_layer_set_selected_next(MenuLayer *menu_layer, bool up, MenuRowAlign scroll_align, bool animated);
 void menu_layer_set_highlight_colors(MenuLayer *menu_layer, GColor background, GColor foreground);
 bool menu_cell_layer_is_highlighted(const Layer *cell_layer);
 void menu_cell_basic_draw(GContext *ctx, const Layer *cell_layer, const char *title, const char *subtitle, GBitmap *icon);
@@ -147,7 +151,7 @@ extern uint32_t MESSAGE_KEY_MSG_TYPE, MESSAGE_KEY_EVT_INDEX, MESSAGE_KEY_EVT_COU
   MESSAGE_KEY_EVT_END, MESSAGE_KEY_EVT_ALLDAY, MESSAGE_KEY_EVT_TITLE, MESSAGE_KEY_EVT_LOCATION,
   MESSAGE_KEY_STATUS_CODE, MESSAGE_KEY_STATUS_TEXT, MESSAGE_KEY_LOGIN_URL, MESSAGE_KEY_LOGIN_CODE,
   MESSAGE_KEY_SET_BRIEF_ENABLED, MESSAGE_KEY_SET_BRIEF_HOUR, MESSAGE_KEY_SET_BRIEF_MINUTE,
-  MESSAGE_KEY_SET_BRIEF_DAYS, MESSAGE_KEY_SET_MODE, MESSAGE_KEY_SET_COUNT;
+  MESSAGE_KEY_SET_BRIEF_DAYS, MESSAGE_KEY_REQ_DAY, MESSAGE_KEY_LIST_DAY, MESSAGE_KEY_LIST_DAYS;
 
 typedef int32_t status_t;
 typedef enum { S_SUCCESS = 0, E_ERROR = -1, E_RANGE = -8 } StatusCode;
@@ -177,6 +181,17 @@ void tick_timer_service_subscribe(TimeUnits tick_units, TickHandler handler);
 void tick_timer_service_unsubscribe(void);
 
 void vibes_short_pulse(void);
+
+/* Touch (PebbleOS: fw/applib/touch_service.h, pbl/services/touch/touch_event.h) */
+#ifdef PBL_TOUCH
+typedef enum TouchEventType { TouchEvent_Touchdown, TouchEvent_Liftoff, TouchEvent_PositionUpdate } TouchEventType;
+typedef struct TouchEvent { TouchEventType type : 8; bool non_navigational; int16_t x; int16_t y; } TouchEvent;
+typedef void (*TouchServiceHandler)(const TouchEvent *event, void *context);
+void touch_service_subscribe(TouchServiceHandler handler, void *context);
+void touch_service_unsubscribe(void);
+bool touch_service_is_enabled(void);
+void app_touch_navigation_enable(bool enable);
+#endif
 bool connection_service_peek_pebble_app_connection(void);
 bool clock_is_24h_style(void);
 void app_event_loop(void);

@@ -41,25 +41,6 @@ function buildConfig(calendars, settings, loggedIn) {
       items: [
         { type: 'heading', defaultValue: 'Anzeige' },
         {
-          type: 'select',
-          messageKey: 'CFG_MODE',
-          label: 'Modus',
-          defaultValue: settings.mode,
-          options: [
-            { label: 'Nur heute', value: 'today' },
-            { label: 'Nächste N Termine', value: 'next' }
-          ]
-        },
-        {
-          type: 'slider',
-          messageKey: 'CFG_COUNT',
-          label: 'Anzahl Termine (N)',
-          defaultValue: settings.count,
-          min: 1,
-          max: 10,
-          step: 1
-        },
-        {
           type: 'toggle',
           messageKey: 'CFG_ALLDAY',
           label: 'Ganztägige Termine anzeigen',
@@ -137,10 +118,6 @@ function applyResult(result, calendars, settings) {
     next.calendars = calendars.filter(function(c, i) { return !!selection[i]; })
                               .map(function(c) { return c.id; });
   }
-  var mode = value(result, 'CFG_MODE', next.mode);
-  next.mode = mode === 'next' ? 'next' : 'today';
-  var count = parseInt(value(result, 'CFG_COUNT', next.count), 10);
-  next.count = isNaN(count) ? 10 : Math.max(1, Math.min(10, count));
   next.showAllDay = !!value(result, 'CFG_ALLDAY', next.showAllDay);
   next.hideDeclined = !!value(result, 'CFG_HIDE_DECLINED', next.hideDeclined);
   next.briefEnabled = !!value(result, 'CFG_BRIEF', next.briefEnabled);

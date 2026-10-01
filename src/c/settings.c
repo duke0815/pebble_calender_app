@@ -13,8 +13,6 @@ static void prv_defaults(void) {
     .brief_hour = 7,
     .brief_minute = 0,
     .brief_days = 0x3E,  // Mo-Fr
-    .mode = MODE_TODAY,
-    .count = 10,
   };
 }
 
@@ -25,9 +23,6 @@ void settings_load(void) {
     if (persist_read_data(PERSIST_KEY_SETTINGS, &stored, sizeof(stored)) == (int)sizeof(stored)) {
       s_settings = stored;
     }
-  }
-  if (s_settings.count < 1 || s_settings.count > 10) {
-    s_settings.count = 10;
   }
 }
 

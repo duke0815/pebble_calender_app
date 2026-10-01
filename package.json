@@ -2,7 +2,9 @@
   "name": "o365-kalender",
   "author": "kasser",
   "version": "1.0.0",
-  "keywords": ["pebble-app"],
+  "keywords": [
+    "pebble-app"
+  ],
   "private": true,
   "dependencies": {
     "pebble-clay": "^1.0.4"
@@ -12,11 +14,17 @@
     "uuid": "c9209dcb-0ee1-4b58-a023-461030dd283f",
     "sdkVersion": "3",
     "enableMultiJS": true,
-    "targetPlatforms": ["emery", "basalt", "diorite"],
+    "targetPlatforms": [
+      "emery",
+      "basalt",
+      "diorite"
+    ],
     "watchapp": {
       "watchface": false
     },
-    "capabilities": ["configurable"],
+    "capabilities": [
+      "configurable"
+    ],
     "messageKeys": [
       "MSG_TYPE",
       "EVT_INDEX",
@@ -34,8 +42,9 @@
       "SET_BRIEF_HOUR",
       "SET_BRIEF_MINUTE",
       "SET_BRIEF_DAYS",
-      "SET_MODE",
-      "SET_COUNT"
+      "REQ_DAY",
+      "LIST_DAY",
+      "LIST_DAYS"
     ],
     "resources": {
       "media": [

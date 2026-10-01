@@ -136,6 +136,9 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
   assert.strictEqual(events[1].EVT_LOCATION, 'Teams');
   var end = sent.filter(function(m) { return m.MSG_TYPE === 2; })[0];
   assert.strictEqual(end.EVT_COUNT, 2);
+  assert.strictEqual(end.LIST_DAYS, 2);
+  var todayStart = Math.floor(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime() / 1000);
+  assert.strictEqual(end.LIST_DAY, todayStart);
 
   var auth = JSON.parse(store.auth);
   assert.strictEqual(auth.refresh, 'RT');
@@ -147,7 +150,7 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
     waitFor(function() { return !!global.openedUrl; }, 1000, function() {
       sent = [];
       var response = encodeURIComponent(JSON.stringify({
-        CFG_CALENDARS: { value: [true] }, CFG_MODE: { value: 'next' }, CFG_COUNT: { value: 3 },
+        CFG_CALENDARS: { value: [true] },
         CFG_ALLDAY: { value: true }, CFG_HIDE_DECLINED: { value: true }, CFG_BRIEF: { value: true },
         CFG_BRIEF_TIME: { value: '06:30' }, CFG_BRIEF_DAYS: { value: [true, true, true, true, true, false, false] },
         CFG_LOGOUT: { value: false }
@@ -159,11 +162,23 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
         assert.strictEqual(settingsMsg.SET_BRIEF_HOUR, 6);
         assert.strictEqual(settingsMsg.SET_BRIEF_MINUTE, 30);
         assert.strictEqual(settingsMsg.SET_BRIEF_DAYS, 62);
-        assert.strictEqual(settingsMsg.SET_MODE, 1);
-        assert.strictEqual(settingsMsg.SET_COUNT, 3);
+        assert.strictEqual(settingsMsg.SET_MODE, undefined);
         assert.ok(requests.some(function(r) { return /\/me\/calendars\/cal1\/calendarView$/.test(r); }),
                   'ausgewählter Kalender wird abgefragt');
-        console.log('Simulation ok');
+        // Blättern: zwei Tage schnell hintereinander anfordern
+        sent = [];
+        var d1 = todayStart + 2 * 86400;
+        var d2 = todayStart - 86400;
+        fire('appmessage', { payload: { MSG_TYPE: 10, REQ_DAY: d1 } });
+        fire('appmessage', { payload: { MSG_TYPE: 10, REQ_DAY: d2 } });
+        waitFor(function() { return sent.filter(function(m) { return m.MSG_TYPE === 2; }).length >= 2; }, 2000, function() {
+          var ends = sent.filter(function(m) { return m.MSG_TYPE === 2; });
+          assert.strictEqual(ends[0].LIST_DAY, d1);
+          assert.strictEqual(ends[0].LIST_DAYS, 1);
+          assert.strictEqual(ends[1].LIST_DAY, d2);
+          assert.ok(!sent.some(function(m) { return m.MSG_TYPE === 3; }), 'kein Status beim Blättern');
+          console.log('Simulation ok');
+        });
       });
     });
   });

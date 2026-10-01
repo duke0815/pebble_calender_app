@@ -20,17 +20,17 @@ var STATUS = {
   CONFIG: 7
 };
 
-var MAX_EVENTS = 16;          // muss zu MAX_EVENTS in src/c/protocol.h passen
-var TITLE_CHARS = 48;
-var TITLE_BYTES = 63;         // Puffer auf der Uhr: 64 inkl. '\0'
-var LOCATION_CHARS = 32;
-var LOCATION_BYTES = 39;      // Puffer auf der Uhr: 40 inkl. '\0'
-var NEXT_MODE_DAYS = 14;
+// Muss zu src/c/protocol.h passen
+var MAX_DAY_EVENTS = 12;      // Termine pro Tag
+var MAX_CACHE_EVENTS = 16;    // Cache-Liste heute + morgen
+var CACHE_DAYS = 2;
+var TITLE_CHARS = 80;
+var TITLE_BYTES = 95;         // Puffer auf der Uhr: 96 inkl. '\0'
+var LOCATION_CHARS = 40;
+var LOCATION_BYTES = 47;      // Puffer auf der Uhr: 48 inkl. '\0'
 
 var DEFAULT_SETTINGS = {
   calendars: [],              // leere Liste = Standardkalender
-  mode: 'today',              // 'today' | 'next'
-  count: 10,
   showAllDay: true,
   hideDeclined: true,
   briefEnabled: false,
@@ -128,11 +128,10 @@ function addDays(date, days) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 
-// Abfragezeitraum je Modus (siehe CLAUDE.md)
-function queryWindow(mode, now) {
-  var start = localDayStart(now);
-  var end = addDays(start, mode === 'next' ? NEXT_MODE_DAYS : 2);
-  return { start: start, end: end };
+// Abfragezeitraum: days Tage ab lokaler Mitternacht von day
+function queryWindow(day, days) {
+  var start = localDayStart(day);
+  return { start: start, end: addDays(start, days) };
 }
 
 function parseTime(text) {
@@ -181,11 +180,15 @@ function normalizeEvent(e) {
 }
 
 // Filtert, sortiert und kuerzt die normalisierten Termine fuer die Uhr.
-function selectEvents(events, settings, now) {
-  var nowSec = Math.floor(now.getTime() / 1000);
-  var win = queryWindow(settings.mode, now);
+// win = queryWindow(...): max. MAX_DAY_EVENTS pro Tag; bei mehreren Tagen (Cache)
+// insgesamt max. MAX_CACHE_EVENTS, wobei der erste Tag Vorrang hat.
+function selectEvents(events, settings, win) {
   var winStart = Math.floor(win.start.getTime() / 1000);
   var winEnd = Math.floor(win.end.getTime() / 1000);
+  var dayStarts = [];
+  for (var d = win.start; d < win.end; d = addDays(d, 1)) {
+    dayStarts.push(Math.floor(d.getTime() / 1000));
+  }
   var seen = {};
 
   var list = events.filter(function(e) {
@@ -193,7 +196,6 @@ function selectEvents(events, settings, now) {
     if (e.allDay && !settings.showAllDay) return false;
     if (e.declined && settings.hideDeclined) return false;
     if (e.start >= winEnd || e.end <= winStart) return false;
-    if (settings.mode === 'next' && e.end <= nowSec) return false;
     // Gleicher Termin in mehreren Kalendern -> nur einmal
     var key = e.start + '|' + e.end + '|' + e.title;
     if (seen[key]) return false;
@@ -207,8 +209,21 @@ function selectEvents(events, settings, now) {
     return a.end - b.end;
   });
 
-  var limit = settings.mode === 'next' ? Math.max(1, Math.min(10, settings.count | 0)) : MAX_EVENTS;
-  return list.slice(0, Math.min(limit, MAX_EVENTS));
+  // Pro Tag zählen (Termine, die vorher begonnen haben, zählen zum ersten Tag)
+  var perDay = dayStarts.map(function() { return 0; });
+  var result = [];
+  var total = dayStarts.length > 1 ? MAX_CACHE_EVENTS : MAX_DAY_EVENTS;
+  list.forEach(function(e) {
+    if (result.length >= total) return;
+    var idx = 0;
+    for (var i = dayStarts.length - 1; i > 0; i--) {
+      if (e.start >= dayStarts[i]) { idx = i; break; }
+    }
+    if (perDay[idx] >= MAX_DAY_EVENTS) return;
+    perDay[idx]++;
+    result.push(e);
+  });
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +274,9 @@ function formEncode(obj) {
 module.exports = {
   MSG: MSG,
   STATUS: STATUS,
-  MAX_EVENTS: MAX_EVENTS,
+  MAX_DAY_EVENTS: MAX_DAY_EVENTS,
+  MAX_CACHE_EVENTS: MAX_CACHE_EVENTS,
+  CACHE_DAYS: CACHE_DAYS,
   DEFAULT_SETTINGS: DEFAULT_SETTINGS,
   mergeSettings: mergeSettings,
   truncate: truncate,

@@ -3,7 +3,7 @@
 set -e
 cd "$(dirname "$0")/../.."
 FLAGS="-std=gnu99 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-field-initializers -Itest/c/stub"
-for defs in "-DPBL_COLOR -DPBL_PLATFORM_EMERY" "-DPBL_COLOR -DPBL_PLATFORM_BASALT" "-DPBL_BW -DPBL_PLATFORM_DIORITE"; do
+for defs in "-DPBL_COLOR -DPBL_TOUCH -DPBL_PLATFORM_EMERY" "-DPBL_COLOR -DPBL_PLATFORM_BASALT" "-DPBL_BW -DPBL_PLATFORM_DIORITE"; do
   gcc $FLAGS -fsyntax-only $defs src/c/*.c
 done
 echo "Syntax ok (emery, basalt, diorite)"

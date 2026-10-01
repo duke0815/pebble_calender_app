@@ -95,3 +95,20 @@ void ui_detail_show(const CalEvent *event) {
   });
   window_stack_push(s_window, true);
 }
+
+bool ui_detail_is_open(void) {
+  return s_window != NULL;
+}
+
+void ui_detail_close(void) {
+  if (s_window) {
+    window_stack_remove(s_window, true);
+  }
+}
+
+void ui_detail_scroll(int dy) {
+  if (!s_scroll) return;
+  GPoint offset = scroll_layer_get_content_offset(s_scroll);
+  offset.y -= dy;  // Offset ist negativ, je weiter unten gelesen wird
+  scroll_layer_set_content_offset(s_scroll, offset, true);
+}

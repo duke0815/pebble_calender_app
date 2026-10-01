@@ -20,12 +20,14 @@
 #define STATUS_ERROR          6
 #define STATUS_CONFIG         7
 
-// Puffergrößen inkl. Nullterminator (JS kürzt auf 63 bzw. 39 Byte UTF-8)
-#define TITLE_LEN     64
-#define LOCATION_LEN  40
+// Puffergrößen inkl. Nullterminator (JS kürzt auf 95 bzw. 47 Byte UTF-8)
+#define TITLE_LEN     96
+#define LOCATION_LEN  48
 #define STATUS_LEN    80
 #define LOGIN_URL_LEN 48
 #define LOGIN_CODE_LEN 16
 
-// Speicherbudget: ~116 Byte pro Termin, 4 KB Persist gesamt
-#define MAX_EVENTS 16
+// Termine pro Tag in der Ansicht
+#define MAX_DAY_EVENTS 12
+// Persist-Cache (heute + morgen): ~156 Byte pro Termin -> 16 * 156 = ~2,5 KB von 4 KB
+#define MAX_CACHE_EVENTS 16

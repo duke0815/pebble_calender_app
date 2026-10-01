@@ -48,9 +48,6 @@ static void prv_handle_settings(DictionaryIterator *iter) {
   s->brief_hour = prv_int(iter, MESSAGE_KEY_SET_BRIEF_HOUR, s->brief_hour) % 24;
   s->brief_minute = prv_int(iter, MESSAGE_KEY_SET_BRIEF_MINUTE, s->brief_minute) % 60;
   s->brief_days = prv_int(iter, MESSAGE_KEY_SET_BRIEF_DAYS, s->brief_days) & 0x7F;
-  s->mode = prv_int(iter, MESSAGE_KEY_SET_MODE, s->mode) ? MODE_NEXT : MODE_TODAY;
-  int count = prv_int(iter, MESSAGE_KEY_SET_COUNT, s->count);
-  s->count = (count < 1) ? 1 : (count > 10 ? 10 : count);
   settings_save();
   settings_schedule_wakeup();
 }
@@ -62,8 +59,10 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
       prv_handle_event(iter);
       break;
     case MSG_END: {
-      bool complete = events_commit(prv_int(iter, MESSAGE_KEY_EVT_COUNT, 0));
-      if (s_handlers.list_updated) s_handlers.list_updated(complete);
+      time_t list_day = prv_int(iter, MESSAGE_KEY_LIST_DAY, 0);
+      int list_days = prv_int(iter, MESSAGE_KEY_LIST_DAYS, 1);
+      bool complete = events_commit(prv_int(iter, MESSAGE_KEY_EVT_COUNT, 0), list_day, list_days);
+      if (s_handlers.list_updated) s_handlers.list_updated(complete, list_day, list_days);
       break;
     }
     case MSG_STATUS: {
@@ -110,11 +109,12 @@ void comm_deinit(void) {
   app_message_deregister_callbacks();
 }
 
-bool comm_send(int msg_type) {
+bool comm_request(time_t day) {
   DictionaryIterator *iter;
   if (app_message_outbox_begin(&iter) != APP_MSG_OK) {
     return false;
   }
-  dict_write_int32(iter, MESSAGE_KEY_MSG_TYPE, msg_type);
+  dict_write_int32(iter, MESSAGE_KEY_MSG_TYPE, MSG_REQUEST);
+  dict_write_int32(iter, MESSAGE_KEY_REQ_DAY, (int32_t)day);
   return app_message_outbox_send() == APP_MSG_OK;
 }

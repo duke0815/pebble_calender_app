@@ -1,7 +1,7 @@
 # CLAUDE.md – Pebble-Kalender-App (Office 365)
 
 ## Projektziel
-Pebble-Watchapp, die Office-365-Kalendertermine anzeigt (heute bzw. die nächsten N Termine) und optional jeden Tag zu einer festen Uhrzeit ein Termin-Briefing auf der Uhr zeigt.
+Pebble-Watchapp, die Office-365-Kalendertermine tageweise anzeigt (Tagesansicht, per Wischen blättern) und optional jeden Tag zu einer festen Uhrzeit ein Termin-Briefing auf der Uhr zeigt.
 
 **Priorität:** Version 1 ist primär für den Eigengebrauch (Pebble Time 2, eigenes Microsoft-Konto). Eine Veröffentlichung im Pebble-App-Store ist später möglich – dann meldet sich jeder Nutzer mit seinem eigenen Microsoft-Konto an. Firmenkonten-Themen (s. „Firmenkonten & Einschränkungen“) werden erst danach angegangen.
 
@@ -20,10 +20,10 @@ Pebble-Watchapp, die Office-365-Kalendertermine anzeigt (heute bzw. die nächste
 
 ## Architektur
 ```
-src/c/main.c         Einstieg, Launch-Reason, Wakeup-Start, Inaktivitäts-Timer
-src/c/events.c/.h    Terminliste, Persist-Cache, Ansicht (Filter/Sections)
+src/c/main.c         Einstieg, Wakeup, Inaktivitäts-Timer, Tage blättern, Touch-Gesten
+src/c/events.c/.h    Cache (heute+morgen), Tagespuffer, Tagesansicht
 src/c/comm.c/.h      AppMessage-Empfang/-Senden
-src/c/settings.c/.h  Uhr-Settings (Briefing, Modus, N) + Wakeup-Planung
+src/c/settings.c/.h  Uhr-Settings (Briefing) + Wakeup-Planung
 src/c/ui_main.c/.h   Hauptfenster: Statuszeile + MenuLayer
 src/c/ui_detail.c/.h Detailansicht eines Termins
 src/c/ui_login.c/.h  Anzeige des Device-Codes
@@ -61,8 +61,8 @@ Zeitberechnung auf der Uhr nur über `time_make_local()` / `time_day_start()` (k
   - calendarView liefert Serientermine bereits aufgelöst – **keinen eigenen RRULE-Parser bauen**.
   - Mehrere ausgewählte Kalender: je Kalender abfragen, zusammenführen, nach Start sortieren, kürzen.
 - Abfragezeitraum:
-  - Modus „Nur heute“: heute 00:00 bis übermorgen 00:00 (lokal). Morgen wird immer mitgeholt und gecacht, damit das Briefing am nächsten Morgen auch offline Daten hat. Die Uhr zeigt nur die heutigen.
-  - Modus „Nächste N“: heute 00:00 bis +14 Tage, nur Termine mit Ende > jetzt, auf N gekürzt.
+  - **Cache-Liste** (App-Start, Briefing): heute 00:00 bis übermorgen 00:00 (lokal). Morgen wird mitgecacht, damit das Briefing am nächsten Morgen auch offline Daten hat. Max. 12 pro Tag, insgesamt max. 16 (heute hat Vorrang).
+  - **Tagesliste** (Blättern auf der Uhr): genau ein Tag, max. 12 Termine. Wird nur bei Bedarf geladen und auf der Uhr nur im RAM gehalten.
 - Zeiten: Graph liefert UTC ohne `Z` → in JS in Epoch-Sekunden umrechnen und so an die Uhr schicken.
   - **Ganztägige Termine:** nur das Datum verwenden, nicht verschieben. Konvention: `EVT_START` = **lokale Mitternacht** des Startdatums, `EVT_END` = lokale Mitternacht des (exklusiven) Enddatums, beides in JS berechnet.
 - Abgesagte (`isCancelled`) und optional abgelehnte Termine (`responseStatus.response == "declined"`) ausfiltern; ganztägige optional ausblenden.
@@ -75,8 +75,6 @@ Clay-Config wird beim Öffnen (`showConfiguration`) **dynamisch** aus der gecach
 | Einstellung | Typ |
 |---|---|
 | Kalender | Checkbox-Gruppe (Default: Standardkalender) |
-| Modus | „Nur heute“ / „Nächste N Termine“ |
-| N | 1–10 (Default 10) |
 | Ganztägige Termine anzeigen | Toggle (Default an) |
 | Abgelehnte Termine ausblenden | Toggle (Default an) |
 | Tägliches Briefing | Toggle (Default aus) |
@@ -84,7 +82,7 @@ Clay-Config wird beim Öffnen (`showConfiguration`) **dynamisch** aus der gecach
 | Briefing-Wochentage | Checkbox-Gruppe (Default Mo–Fr) |
 | Abmelden | Toggle → Tokens löschen |
 
-Settings, die die Uhr betreffen (Briefing an/aus, Uhrzeit, Wochentage, Modus, N), per AppMessage (`MSG_TYPE = 5`) an die Uhr schicken und dort persistieren. JS schickt sie zusätzlich zu Beginn jeder Synchronisierung.
+Settings, die die Uhr betreffen (Briefing an/aus, Uhrzeit, Wochentage), per AppMessage (`MSG_TYPE = 5`) an die Uhr schicken und dort persistieren. JS schickt sie zusätzlich zu Beginn jeder Synchronisierung.
 
 ## AppMessage-Protokoll
 Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NACK-Retry (bis 4 Versuche, wachsende Pause).
@@ -95,19 +93,20 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 | `EVT_INDEX` / `EVT_COUNT` | int | Position / Gesamtzahl (`EVT_COUNT` auch bei MSG_TYPE 2) |
 | `EVT_START` / `EVT_END` | int32 | Epoch-Sekunden (ganztägig: lokale Mitternacht, s. o.) |
 | `EVT_ALLDAY` | int | 0/1 |
-| `EVT_TITLE` | cstring | max. 48 Zeichen **und** max. 63 Byte UTF-8, in JS gekürzt (`...`) |
-| `EVT_LOCATION` | cstring | max. 32 Zeichen **und** max. 39 Byte UTF-8 |
+| `EVT_TITLE` | cstring | max. 80 Zeichen **und** max. 95 Byte UTF-8, in JS gekürzt (`...`) |
+| `EVT_LOCATION` | cstring | max. 40 Zeichen **und** max. 47 Byte UTF-8 |
+| `LIST_DAY` / `LIST_DAYS` | int | bei MSG_TYPE 2: lokale Mitternacht (Epoch) des ersten Tages / Anzahl Tage (2 = Cache, 1 = einzelner Tag) |
+| `REQ_DAY` | int | bei MSG_TYPE 10: 0 = Cache neu laden, sonst lokale Mitternacht des gewünschten Tages (JS schickt sie als `LIST_DAY` unverändert zurück) |
 | `STATUS_CODE` | int | 1 = Synchronisiere, 2 = Anmeldung nötig, 3 = Admin-Freigabe nötig, 4 = Richtlinie blockiert, 5 = Keine Verbindung, 6 = Sonstiger Fehler, 7 = Konfiguration fehlt |
 | `STATUS_TEXT` | cstring | Fehler-/Statustext (deutsch, kurz) |
 | `LOGIN_URL` / `LOGIN_CODE` | cstring | Device-Code-Anzeige |
 | `SET_BRIEF_ENABLED` | int | 0/1 |
 | `SET_BRIEF_HOUR` / `SET_BRIEF_MINUTE` | int | Briefing-Uhrzeit |
 | `SET_BRIEF_DAYS` | int | Bitmaske, Bit 0 = Sonntag … Bit 6 = Samstag (wie `tm_wday`); Mo–Fr = 62 |
-| `SET_MODE` | int | 0 = Nur heute, 1 = Nächste N |
-| `SET_COUNT` | int | N (1–10) |
 
 - **Genau eine Synchronisierung pro App-Start:** JS synchronisiert beim `ready`-Event; die Uhr sendet beim Start nichts, sondern wartet (Statuszeile „Aktualisiere...“, Timeout) und zeigt bis dahin den Cache. Kein manuelles Aktualisieren, kein periodisches Nachladen.
-- `MSG_TYPE = 10` sendet die Uhr nur, wenn das Briefing fällig wird, während die App bereits offen ist. Weitere Syncs gibt es nur nach dem Speichern der Einstellungen. Parallele Anfragen fasst JS zusammen.
+- `MSG_TYPE = 10` sendet die Uhr beim Blättern zu einem Tag außerhalb des Caches (`REQ_DAY` = Tag) und wenn das Briefing bei offener App fällig wird (`REQ_DAY` = 0). Sonst lädt JS nur nach dem Speichern der Einstellungen neu.
+- JS arbeitet Aufträge nacheinander ab: Cache-Anfragen während eines laufenden Cache-Syncs werden zusammengefasst; bei Tagesanfragen zählt nur die zuletzt angeforderte. Tagesanfragen senden keinen SYNCING-Status.
 - Die Uhr übernimmt eine neue Liste nur, wenn bei `MSG_TYPE = 2` alle `EVT_COUNT` Termine angekommen sind – sonst bleibt der alte Cache.
 - Jede Nachricht außer 4 schließt das Login-Fenster auf der Uhr.
 - Texte für die Uhr kein „…“-Zeichen verwenden, sondern `...` (Font-Abdeckung).
@@ -115,20 +114,22 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 ## Watchapp (C)
 - Statuszeile oben: „Stand HH:MM“, „Aktualisiere...“, „Offline · Stand HH:MM“ oder Fehlertext.
 - `MenuLayer` darunter, eigene Zeilenzeichnung: Uhrzeit-Spanne (bzw. „Ganztägig“), Titel, Ort. Vergangene Termine grau.
-- Tagesüberschriften als Sections („Heute · Mi 01.10.“, „Morgen · …“, „Fr 03.10.“). Termine, die vor heute begonnen haben, erscheinen unter „Heute“.
+- **Tagesansicht:** immer genau ein Tag (max. 12 Termine), Überschrift „< Heute, Mi 01.10. >“ / „< Morgen, … >“ / „< Fr 03.10. >“. Termine, die vor dem Tag begonnen haben, erscheinen mit.
+- **Touch (nur `PBL_TOUCH`, Pebble Time 2):** eigene Gestenerkennung über `touch_service_subscribe()` (System-Touchnavigation bleibt aus). Wischen links = nächster Tag, rechts = vorheriger Tag, hoch/runter = Auswahl scrollen (1 Zeile pro ~60 px). In der Detailansicht: hoch/runter scrollt, rechts wischen = zurück. Tippen tut nichts. Blätterbereich: −60 bis +90 Tage. Andere Plattformen: keine Tagesnavigation.
+- Tage im Cache (heute/morgen) kommen sofort; andere Tage fordert die Uhr an („Lade Tag...“, Timeout 15 s). Um Mitternacht springt die Ansicht mit, wenn „heute“ angezeigt war.
 - Keine Aktions-Einträge (kein „Aktualisieren“/„Anmelden“) – bewusst entfernt.
 - Select auf einem Termin → Detailfenster (Datum, Zeit, voller Titel, Ort). Schrift dort bewusst klein: emery Titel GOTHIC_24_BOLD, Zeit GOTHIC_18_BOLD, Rest GOTHIC_18 (andere Plattformen eine Stufe kleiner).
 - Minütlicher Tick → Ansicht neu berechnen (vergangene Termine, Tageswechsel).
 - **Cache:** jeder Termin unter eigenem Persist-Key (256-Byte-Limit pro Key) + Anzahl + Zeitstempel des letzten Syncs + Cache-Version. Beim Start sofort Cache anzeigen, dann aktualisieren.
-- **Speicherbudget:** Persistenter Speicher ist insgesamt ca. 4 KB pro App. Ein Termin belegt ~116 Byte → **max. 16 Termine** im Cache (~1,9 KB) plus Settings. Nicht erhöhen, ohne nachzurechnen.
-- Leerer Zustand: „Keine Termine heute“ bzw. „Keine anstehenden Termine“; bei Fehlern der Fehlertext.
+- **Speicherbudget:** Persistenter Speicher ist insgesamt ca. 4 KB pro App. Ein Termin belegt 156 Byte → **max. 16 Termine** im Cache (~2,5 KB) plus Settings. Nicht erhöhen, ohne nachzurechnen. Tagespuffer (12 Termine) nur im RAM.
+- Leerer Zustand: „Keine Termine heute“ bzw. „Keine Termine“; bei Fehlern der Fehlertext; ohne Daten/Verbindung „Keine Verbindung zum Handy.“
 - Timeout für eine Synchronisierung: 30 s (außer während des Logins), dann „Offline“.
 
 ## Tägliches Briefing (Wakeup-API)
 - `wakeup_schedule()` immer nur für den **nächsten** Briefing-Zeitpunkt (berücksichtigt Wochentage); vorher `wakeup_cancel_all()`.
 - Neu planen: bei jedem App-Start, nach jeder Settings-Änderung und bei jedem Wakeup.
 - Kollision (`E_RANGE`): bis zu 5× je +1 Minute versuchen.
-- Start mit `APP_LAUNCH_WAKEUP` (oder Wakeup bei offener App): kurz vibrieren, frische Daten anfordern (Timeout 10 s), sonst Cache mit „Offline · Stand …“ anzeigen. App nach 60 s ohne Interaktion selbst schließen (nur beim Wakeup-Start).
+- Start mit `APP_LAUNCH_WAKEUP` (oder Wakeup bei offener App, dann Sprung auf heute): kurz vibrieren, frische Daten anfordern (Timeout 10 s), sonst Cache mit „Offline · Stand …“ anzeigen. App nach 60 s ohne Interaktion selbst schließen (nur beim Wakeup-Start).
 - Abend-Caching ist über den Abfragezeitraum „heute + morgen“ abgedeckt.
 
 ## Firmenkonten & Einschränkungen
@@ -160,7 +161,7 @@ Positionierung bei Veröffentlichung: primär Privatkonten und kleine Firmen, ni
 3. ✅ Graph-Abfrage + AppMessage-Übertragung
 4. ✅ Cache auf der Uhr
 5. ✅ Clay-Einstellungen inkl. dynamischer Kalenderliste
-6. ✅ Modus „Nächste N“, mehrere Kalender
+6. ✅ Mehrere Kalender; Tagesansicht mit Blättern per Touch (ersetzt die Modi „Nur heute“/„Nächste N“)
 7. ✅ Tägliches Briefing per Wakeup
 8. ✅ Fehlerzustände (erste Fassung) – Feinschliff nach Test auf echter Hardware
 

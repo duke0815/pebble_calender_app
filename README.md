@@ -1,6 +1,6 @@
 # O365 Kalender für Pebble
 
-Pebble-Watchapp (Ziel: Pebble Time 2), die Termine aus deinem Microsoft-365-/Outlook-Kalender anzeigt und optional jeden Morgen ein Termin-Briefing auf der Uhr zeigt. Kein eigener Server: Microsoft Graph → Handy (PebbleKit JS) → Uhr.
+Pebble-Watchapp (Ziel: Pebble Time 2), die Termine aus deinem Microsoft-365-/Outlook-Kalender tageweise anzeigt und optional jeden Morgen ein Termin-Briefing auf der Uhr zeigt. Kein eigener Server: Microsoft Graph → Handy (PebbleKit JS) → Uhr.
 
 Details zu Architektur, Protokoll und Entscheidungen: [CLAUDE.md](CLAUDE.md).
 
@@ -48,12 +48,13 @@ Alternativ die `build/*.pbw` aufs Handy kopieren und mit der Pebble-App öffnen.
 2. Am PC oder Handy `microsoft.com/devicelogin` öffnen, den Code eingeben und mit deinem Microsoft-Konto anmelden.
 3. **App auf der Uhr währenddessen offen lassen.** Danach erscheinen die Termine.
 
-Einstellungen (Kalender, Modus, Briefing) findest du in der Pebble-App am Handy unter den Einstellungen der Watchapp.
+Einstellungen (Kalender, Briefing) findest du in der Pebble-App am Handy unter den Einstellungen der Watchapp.
 
 ## Bedienung
 
-- **Liste:** Termine nach Tagen gruppiert, vergangene grau. Oben steht der Stand der letzten Synchronisierung oder „Offline“.
-- **Select auf einem Termin:** Detailansicht.
+- **Tagesansicht:** bis zu 12 Termine eines Tages, vergangene grau. Oben steht der Stand der letzten Synchronisierung oder „Offline“.
+- **Wischen (Pebble Time 2):** links = nächster Tag, rechts = vorheriger Tag, hoch/runter = scrollen. Heute und morgen sind sofort da (auch offline), andere Tage werden vom Handy geladen.
+- **Select auf einem Termin:** Detailansicht (dort: hoch/runter wischen scrollt, rechts wischen = zurück).
 - **Aktualisieren:** automatisch einmal beim Öffnen der App.
 - **Konto wechseln:** in den Einstellungen „Abmelden“, dann die App neu öffnen.
 - **Briefing:** Zur eingestellten Zeit startet die App, vibriert, lädt frische Daten (sonst Cache) und schließt sich nach 60 s ohne Bedienung wieder.
