@@ -39,11 +39,11 @@ Not affiliated with or endorsed by Microsoft. Office 365, Microsoft 365 and Outl
 - Source: https://github.com/duke0815/pebble_calender_app
 
 ## Screenshots
-Taken with `sh tools/screenshots.sh` (demo mode with neutral English sample data, saved to `store/screenshots/`), per platform:
+In `store/screenshots/` (`<platform>-<n>-<name>.png`), generated automatically with `sh tools/screenshots.sh` (demo mode with neutral English sample data). Per platform (emery, basalt, diorite, flint):
 1. Day view of today
 2. Selected event
 3. Event details with description
 4. Move options
 5. Tomorrow
 
-Optional: run `pebble emu-app-config --emulator emery` during the script and change the colors for an extra color screenshot.
+Suggested store order: emery 1, 2, 3, 4, 5 (Pebble Time 2 is the main target).

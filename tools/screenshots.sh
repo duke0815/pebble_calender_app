@@ -1,9 +1,8 @@
 #!/bin/sh
 # Store screenshots with neutral English sample data (demo mode: no sign-in, no network).
 # Usage: sh tools/screenshots.sh [platform ...]   (default: emery basalt diorite flint)
-# Builds a demo version, installs it in the emulator and takes a screenshot after each
-# step you do in the emulator window (arrow keys: up/down, right = Select, left = Back).
-# The app closes itself after 5 minutes without input - then just run the script again.
+# Builds a demo version, installs it in the emulator, presses the buttons itself
+# (pebble emu-button) and saves 5 screenshots per platform to store/screenshots/.
 # At the end the normal version is built again, so build/*.pbw is never the demo.
 set -e
 cd "$(dirname "$0")/.."
@@ -22,30 +21,27 @@ trap restore EXIT
 
 sed -i 's/^var DEMO = false;/var DEMO = true;/' src/pkjs/index.js
 grep -q '^var DEMO = true;' src/pkjs/index.js || { echo "DEMO switch not found in index.js"; exit 1; }
-pebble build
+pebble build >/dev/null
 mkdir -p "$OUT"
 
 for p in $PLATFORMS; do
-  echo
   echo "=== $p ==="
   if ! pebble install --emulator "$p"; then
     echo "Emulator $p not available - skipped."
     continue
   fi
-  n=0
-  shot() {
-    n=$((n + 1))
-    printf '%s\n  -> then press Enter (s = skip) ' "$1"
-    read answer
-    [ "$answer" = "s" ] && return 0
-    pebble screenshot --emulator "$p" --no-open "$OUT/$p-$n-$2.png"
-  }
-  shot "Wait until 'Updating...' is gone (day view of today)." day
-  shot "Press Down 3x (selection on 'Product review')." selected
-  shot "Press Select (details with description; wait for it to load)." details
-  shot "Press Back, Down 2x to 'Dentist appointment', Select, Select (move options)." move
-  shot "Press Back 2x, then hold Down ~1 s (tomorrow; if holding does not work: s)." tomorrow
+  btn() { pebble emu-button --emulator "$p" "$@" >/dev/null; }
+  shot() { pebble screenshot --emulator "$p" --no-open "$OUT/$p-$1.png" >/dev/null && echo "  $OUT/$p-$1.png"; }
+
+  sleep 6                                  # demo sync
+  shot 1-day
+  btn click down; btn click down; btn click down   # first press only shows the selection
+  sleep 1; shot 2-selected                 # "Product review"
+  btn click select; sleep 3; shot 3-details
+  btn click select; sleep 1; shot 4-move   # move options
+  btn click back; btn click back; sleep 1
+  btn push down; sleep 1; btn release down; sleep 3
+  shot 5-tomorrow
 done
 
-echo
 echo "Screenshots in $OUT/"

@@ -225,13 +225,13 @@ Positioning for publication: primarily personal accounts and small organizations
 8. ✅ Error states (first version) – fine-tuning after testing on real hardware
 9. ✅ Moving events, colors, English, auto close, flint, demo mode for screenshots
 
-Status: built by the owner with the real SDK and **tested in daily use on the Pebble Time 2** (display, touch, description, colors, language, moving own events with and without attendees work). The Claude build environment has no access to the SDK server: there C is compiled against the stub header and JS is checked with Node tests – build errors from the real SDK therefore only show up for the owner.
+Status: built by the owner with the real SDK and **tested in daily use on the Pebble Time 2** (display, touch, description, colors, language, moving own events with and without attendees work). The Claude environment can now reach `sdk.repebble.com` (allowed by the owner): `pebble sdk install latest`, `pebble build` and the emulator work there. One local fix is needed in a fresh container: the container has no IPv6, so pypkjs must bind IPv4 – in `pypkjs/runner/websocket.py` (pebble-tool's site-packages) replace `WSGIServer(("", self.port)` with `WSGIServer(("0.0.0.0", self.port)`; otherwise `pebble install --emulator` fails with "Connection refused".
 
 ## Before the store release
 - Publisher verification in Entra ID (Microsoft partner ID) – a precondition for users in other tenants to consent themselves at all.
 - Store description: clear note on the limitations with work accounts (see above) – `store/listing.md`.
 - Privacy policy: no data processing by the developer, everything stays on the device – `docs/privacy.md`.
-- Screenshots: `sh tools/screenshots.sh` (run by the owner – the SDK is not reachable from the Claude environment).
+- Screenshots: ✅ `store/screenshots/` (20 PNGs, all platforms), regenerate with `sh tools/screenshots.sh` – fully automatic via `pebble emu-button`.
 
 ## App name
 - **"Calendar for Office 365"** (`displayName` in `package.json`, heading of the settings page, README). "Office 365" is a Microsoft trademark – phrase it clearly as "for" in the store text (not an official Microsoft product).

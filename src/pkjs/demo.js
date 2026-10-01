@@ -78,7 +78,7 @@ var TODAY = [
   ['Project deadline', null, null, '', {}],
   ['Team stand-up', '08:30', '08:45', 'Microsoft Teams', { organizer: 'Sam Taylor',
     attendees: ['Me', 'Chris Lee', 'Dana Fox'], notes: 'Yesterday, today, blockers. Keep it short.' + TEAMS }],
-  ['Product review', '10:00', '11:30', 'Conference Room A', { attendees: ['Chris Lee', 'Dana Fox', 'Jordan Kim'],
+  ['Product review', '10:00', '11:30', 'Conference Room A', {
     notes: 'Agenda:\r\n- Q4 roadmap\r\n- Open issues\r\n- Next steps\r\n\r\nPlease bring the latest numbers.' }],
   ['Lunch with Alex', '12:30', '13:30', 'Corner Bistro', { notes: 'Table for two booked.' }],
   ['Dentist appointment', '15:00', '15:30', 'Main Street 12', { notes: 'Bring insurance card.' }],

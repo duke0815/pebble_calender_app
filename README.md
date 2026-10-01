@@ -94,7 +94,7 @@ sh tools/screenshots.sh            # emery basalt diorite flint
 sh tools/screenshots.sh emery      # one platform
 ```
 
-Builds a version with neutral English sample events (no sign-in, no network: `DEMO = true` in `src/pkjs/index.js`, data in `src/pkjs/demo.js`), installs it in the emulator and saves a screenshot after each step to `store/screenshots/`. Afterwards it switches demo mode off and builds the normal version again.
+Builds a version with neutral English sample events (no sign-in, no network: `DEMO = true` in `src/pkjs/index.js`, data in `src/pkjs/demo.js`), installs it in the emulator, presses the buttons itself (`pebble emu-button`) and saves 5 screenshots per platform to `store/screenshots/`. Afterwards it switches demo mode off and builds the normal version again.
 
 ## Tests
 
