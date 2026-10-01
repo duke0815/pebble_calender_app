@@ -59,7 +59,7 @@ Zeitberechnung auf der Uhr nur über `time_make_local()` / `time_day_start()` (k
 
 ## Microsoft Graph
 - Kalenderliste: `GET /v1.0/me/calendars?$select=id,name,isDefaultCalendar` → in `localStorage` cachen (max. 1×/Tag automatisch erneuern, sonst beim Öffnen der Einstellungen).
-- Termine: `GET /v1.0/me/calendars/{id}/calendarView?startDateTime=…&endDateTime=…&$select=id,subject,bodyPreview,start,end,isAllDay,location,isCancelled,showAs,responseStatus&$orderby=start/dateTime&$top=50`
+- Termine: `GET /v1.0/me/calendars/{id}/calendarView?startDateTime=…&endDateTime=…&$select=id,subject,bodyPreview,start,end,isAllDay,location,isCancelled,showAs,responseStatus,isOrganizer,organizer,attendees&$orderby=start/dateTime&$top=50`
   - Ohne Kalenderauswahl: `/v1.0/me/calendar/calendarView` (Standardkalender).
   - Header `Prefer: outlook.timezone="UTC"` immer mitsenden.
   - calendarView liefert Serientermine bereits aufgelöst – **keinen eigenen RRULE-Parser bauen**.
@@ -112,7 +112,7 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 | `EVT_TITLE` | cstring | max. 80 Zeichen **und** max. 95 Byte UTF-8, in JS gekürzt (`...`) |
 | `EVT_LOCATION` | cstring | max. 40 Zeichen **und** max. 47 Byte UTF-8 |
 | `EVT_KEY` | int32 | Kennung des Termins (bei MSG_TYPE 1, 6, 12) |
-| `EVT_FLAGS` | int | bei MSG_TYPE 1: Bit 0 = verschiebbar (JS: `lib.isMovable`) |
+| `EVT_FLAGS` | int | bei MSG_TYPE 1: Bit 0 = verschiebbar, Bit 1 = nicht Organisator, Bit 2 = hat Teilnehmer, Bit 3 = Verschieben am Handy an (`lib.moveFlags`) |
 | `MOVE_OPT` | int | bei MSG_TYPE 13: 0 = +1 Stunde, 1 = +1 Tag, 2 = +2 Tage, 3 = +1 Woche |
 | `MOVE_OK` | int | bei MSG_TYPE 7: 1 = verschoben, 0 = Fehler (Text in `STATUS_TEXT`) |
 | `SET_MOVE_OPTS` | int | Bitmaske der erlaubten Optionen, 0 = Verschieben aus |
@@ -163,6 +163,8 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 
 ## Termine verschieben (opt-in)
 - Nur wenn in den Einstellungen eingeschaltet. Verschiebbar (`lib.isMovable`): `isOrganizer` und – bei „Erlaubt für“ = `solo` – keine Teilnehmer (Räume zählen als Teilnehmer). Einladungen anderer nie.
+- Teilnehmer zählen ohne den Organisator selbst (`lib.countAttendees`: Adresse = `organizer.emailAddress` oder `status.response == 'organizer'` wird ignoriert) – Outlook listet den Organisator teils in `attendees`; sonst wäre im `solo`-Modus nichts verschiebbar (in der Praxis so aufgetreten).
+- `EVT_FLAGS`-Bits für die Diagnose: 1 = verschiebbar, 2 = nicht Organisator, 4 = hat Teilnehmer, 8 = Verschieben am Handy an. Die Detailansicht zeigt bei eingeschaltetem Verschieben den Grund, warum ein Termin nicht verschiebbar ist (grau), bzw. „Einstellungen fehlen auf der Uhr“.
 - Uhr: Detailansicht zeigt „Select: Verschieben“ (Akzentfarbe); Select → `ui_move`: Liste der freigegebenen Optionen mit Zieldatum/-zeit (+1 Stunde nicht bei ganztägig) → Bestätigung „Verschieben auf …?“ (Select = Ja, Zurück = Nein) → „Verschiebe...“ (Timeout 12 s, Sende-Retry) → „Verschoben auf …“ + Vibration, nach 1,5 s zurück zur Tagesansicht; Fehler bleiben stehen (Doppelvibration).
 - Handy: prüft Berechtigung erneut (Index `notes` speichert id/start/end/allDay/movable), dann `PATCH /me/events/{id}` mit neuem start/end (UTC; Tage behalten die lokale Uhrzeit, auch über DST; ganztägig: Datum + `T00:00:00`, `timeZone: UTC`). Danach `sync(true)`; die Uhr verwirft den Tagespuffer und lädt den angezeigten Tag neu.
 - Serientermine: verschoben wird nur das eine Vorkommen (Graph legt eine Ausnahme an).

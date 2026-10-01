@@ -248,9 +248,23 @@ test('Verschieben: Berechtigung, Zeiten, Graph-Body', function() {
     start: { dateTime: '2026-10-02T00:00:00', timeZone: 'UTC' },
     end: { dateTime: '2026-10-03T00:00:00', timeZone: 'UTC' }
   });
+  assert.strictEqual(lib.moveFlags(solo, on), 1 | 8);
+  assert.strictEqual(lib.moveFlags({ isOrganizer: false, attendees: 2 }, on), 2 | 4 | 8);
+  assert.strictEqual(lib.moveFlags(solo, lib.mergeSettings({})), 0);
   var n = lib.normalizeEvent({ id: 'a', isOrganizer: true, attendees: [{}, {}], start: { dateTime: '2026-10-01T07:00:00' },
                                end: { dateTime: '2026-10-01T08:00:00' } });
   assert.strictEqual(n.attendees, 2);
+  // Organisator in der Teilnehmerliste zählt nicht
+  var me = { emailAddress: { address: 'Me@Example.com' } };
+  var self = lib.normalizeEvent({ id: 'b', isOrganizer: true, organizer: me,
+    attendees: [{ emailAddress: { address: 'me@example.com' }, status: { response: 'none' } }],
+    start: { dateTime: '2026-10-01T07:00:00' }, end: { dateTime: '2026-10-01T08:00:00' } });
+  assert.strictEqual(self.attendees, 0);
+  var self2 = lib.normalizeEvent({ id: 'c', isOrganizer: true,
+    attendees: [{ emailAddress: { address: 'x@y.z' }, status: { response: 'organizer' } }],
+    start: { dateTime: '2026-10-01T07:00:00' }, end: { dateTime: '2026-10-01T08:00:00' } });
+  assert.strictEqual(self2.attendees, 0);
+  assert.strictEqual(lib.isMovable(self, on), true);
 
   var applied = config.applyResult({ CFG_MOVE: { value: true }, CFG_MOVE_SCOPE: { value: 'own' },
                                      CFG_MOVE_OPTS: { value: [true, false, false, true] } }, [], lib.mergeSettings({}));

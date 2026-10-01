@@ -222,6 +222,18 @@ function cleanNotes(text) {
   return out;
 }
 
+// Teilnehmer ohne den Organisator selbst: Outlook führt den Organisator teils auch in
+// attendees (mit status.response = 'organizer') – der zählt nicht als "hat Teilnehmer".
+function countAttendees(e) {
+  var organizer = String((e.organizer && e.organizer.emailAddress && e.organizer.emailAddress.address) || '')
+    .toLowerCase();
+  return (e.attendees || []).filter(function(a) {
+    var address = String((a.emailAddress && a.emailAddress.address) || '').toLowerCase();
+    var response = a.status && a.status.response;
+    return response !== 'organizer' && !(organizer && address === organizer);
+  }).length;
+}
+
 function normalizeEvent(e) {
   if (!e || e.isCancelled) return null;
   var allDay = !!e.isAllDay;
@@ -242,7 +254,7 @@ function normalizeEvent(e) {
     location: truncate((e.location && e.location.displayName) || '', LOCATION_CHARS, LOCATION_BYTES),
     declined: !!(e.responseStatus && e.responseStatus.response === 'declined'),
     isOrganizer: !!e.isOrganizer,
-    attendees: (e.attendees || []).length
+    attendees: countAttendees(e)
   };
 }
 
@@ -254,6 +266,17 @@ function normalizeEvent(e) {
 function isMovable(e, settings) {
   if (!e || !settings.moveEnabled || !e.isOrganizer) return false;
   return settings.moveScope === 'own' || !e.attendees;
+}
+
+// EVT_FLAGS für die Uhr: Bit 0 verschiebbar; Gründe, warum nicht (für den Hinweis in der
+// Detailansicht): Bit 1 = nicht Organisator, Bit 2 = hat Teilnehmer, Bit 3 = Verschieben am Handy an
+function moveFlags(e, settings) {
+  var flags = 0;
+  if (isMovable(e, settings)) flags |= 1;
+  if (!e.isOrganizer) flags |= 2;
+  if (e.attendees) flags |= 4;
+  if (settings.moveEnabled) flags |= 8;
+  return flags;
 }
 
 function pad2(n) {
@@ -408,6 +431,7 @@ module.exports = {
   normalizeEvent: normalizeEvent,
   MOVE_OPTIONS: MOVE_OPTIONS,
   isMovable: isMovable,
+  moveFlags: moveFlags,
   shiftEvent: shiftEvent,
   graphMoveBody: graphMoveBody,
   eventKey: eventKey,

@@ -85,6 +85,15 @@ bool ui_move_available(const CalEvent *event) {
   return false;
 }
 
+const char *ui_move_reason(const CalEvent *event) {
+  if (ui_move_available(event)) return NULL;
+  if (!(event->flags & EVT_FLAG_MOVE_ENABLED)) return NULL;  // Funktion aus: kein Hinweis
+  if (settings_get()->move_opts == 0) return tr(STR_MOVE_NO_SETTINGS);
+  if (event->flags & EVT_FLAG_NOT_ORGANIZER) return tr(STR_MOVE_NOT_ORGANIZER);
+  if (event->flags & EVT_FLAG_HAS_ATTENDEES) return tr(STR_MOVE_HAS_ATTENDEES);
+  return tr(STR_MOVE_NO_OPTION);
+}
+
 // ---------------------------------------------------------------------------
 // Bestätigung, Senden, Ergebnis
 

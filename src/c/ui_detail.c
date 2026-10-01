@@ -158,6 +158,10 @@ static void prv_window_load(Window *window) {
   if (ui_move_available(&s_event)) {
     y = prv_add_text(L_MOVE_HINT, tr(STR_MOVE_HINT), FONT_SMALL, y + 2);
     text_layer_set_text_color(s_layers[L_MOVE_HINT], PBL_IF_COLOR_ELSE(theme_accent(), theme_text()));
+  } else if (ui_move_reason(&s_event)) {
+    // Verschieben ist an, aber nicht für diesen Termin -> Grund anzeigen
+    y = prv_add_text(L_MOVE_HINT, ui_move_reason(&s_event), FONT_SMALL, y + 2);
+    text_layer_set_text_color(s_layers[L_MOVE_HINT], theme_muted());
   }
   scroll_layer_set_content_size(s_scroll, GSize(s_width, y + PAD));
 

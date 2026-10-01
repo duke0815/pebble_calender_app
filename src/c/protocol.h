@@ -16,7 +16,10 @@
 #define MSG_MOVE         13
 
 // EVT_FLAGS
-#define EVT_FLAG_MOVABLE 1
+#define EVT_FLAG_MOVABLE       1
+#define EVT_FLAG_NOT_ORGANIZER 2   // Einladung eines anderen
+#define EVT_FLAG_HAS_ATTENDEES 4
+#define EVT_FLAG_MOVE_ENABLED  8   // Verschieben ist am Handy eingeschaltet
 
 // Verschiebe-Optionen (MOVE_OPT, Bits in SET_MOVE_OPTS) – wie MOVE_OPTIONS in lib.js
 #define MOVE_OPT_HOUR  0

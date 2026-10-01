@@ -38,6 +38,10 @@ typedef enum {
   STR_MOVING,
   STR_MOVED,             // "%s" = Ziel
   STR_MOVE_FAILED,
+  STR_MOVE_NO_SETTINGS,
+  STR_MOVE_NOT_ORGANIZER,
+  STR_MOVE_HAS_ATTENDEES,
+  STR_MOVE_NO_OPTION,
   STR_COUNT
 } StrId;
 

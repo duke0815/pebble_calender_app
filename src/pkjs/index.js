@@ -19,7 +19,7 @@ var SCOPE_RW = 'https://graph.microsoft.com/Calendars.ReadWrite offline_access';
 var LOGIN_BASE = 'https://login.microsoftonline.com/' + AUTHORITY + '/oauth2/v2.0/';
 var GRAPH = 'https://graph.microsoft.com/v1.0';
 var EVENT_FIELDS = 'id,subject,bodyPreview,start,end,isAllDay,location,isCancelled,showAs,responseStatus,' +
-                   'isOrganizer,attendees';
+                   'isOrganizer,organizer,attendees';
 var NOTES_INDEX_MAX = 80;
 var CALENDAR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 var TOKEN_MARGIN_MS = 5 * 60 * 1000;
@@ -224,7 +224,7 @@ function sendEvents(events, listDay, listDays) {
       EVT_TITLE: e.title,
       EVT_LOCATION: e.location,
       EVT_KEY: e.key,
-      EVT_FLAGS: e.movable ? 1 : 0
+      EVT_FLAGS: e.flags || 0
     });
   });
   enqueue({ MSG_TYPE: MSG.END, EVT_COUNT: events.length, LIST_DAY: listDay, LIST_DAYS: listDays });
@@ -557,7 +557,10 @@ function run() {
         done(fetchErr);
         return;
       }
-      events.forEach(function(ev) { ev.movable = lib.isMovable(ev, settings); });
+      events.forEach(function(ev) {
+        ev.movable = lib.isMovable(ev, settings);
+        ev.flags = lib.moveFlags(ev, settings);
+      });
       sendEvents(events, listDay, isCache ? lib.CACHE_DAYS : 1);
       done(null);
       if (isCache && Date.now() - getCalendars().fetched > CALENDAR_MAX_AGE_MS) {

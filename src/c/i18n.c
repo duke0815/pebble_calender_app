@@ -35,6 +35,10 @@ static const char *const STRINGS[2][STR_COUNT] = {
     [STR_MOVING] = "Verschiebe...",
     [STR_MOVED] = "Verschoben auf\n%s",
     [STR_MOVE_FAILED] = "Verschieben fehlgeschlagen",
+    [STR_MOVE_NO_SETTINGS] = "Verschieben: Einstellungen fehlen auf der Uhr. App neu öffnen.",
+    [STR_MOVE_NOT_ORGANIZER] = "Nicht verschiebbar: Einladung eines anderen",
+    [STR_MOVE_HAS_ATTENDEES] = "Nicht verschiebbar: hat Teilnehmer (siehe Einstellungen)",
+    [STR_MOVE_NO_OPTION] = "Nicht verschiebbar: keine passende Option",
   },
   [LANG_EN] = {
     [STR_TODAY] = "Today",
@@ -69,6 +73,10 @@ static const char *const STRINGS[2][STR_COUNT] = {
     [STR_MOVING] = "Moving...",
     [STR_MOVED] = "Moved to\n%s",
     [STR_MOVE_FAILED] = "Move failed",
+    [STR_MOVE_NO_SETTINGS] = "Move: settings missing on the watch. Reopen the app.",
+    [STR_MOVE_NOT_ORGANIZER] = "Cannot move: invitation from someone else",
+    [STR_MOVE_HAS_ATTENDEES] = "Cannot move: has attendees (see settings)",
+    [STR_MOVE_NO_OPTION] = "Cannot move: no matching option",
   },
 };
 

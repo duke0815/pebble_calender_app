@@ -223,7 +223,8 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
                 var s5 = sent.filter(function(m) { return m.MSG_TYPE === 5; }).pop();
                 assert.strictEqual(s5.SET_MOVE_OPTS, 10);
                 var ev = sent.filter(function(m) { return m.MSG_TYPE === 1 && m.EVT_TITLE === 'Standup'; })[0];
-                assert.strictEqual(ev.EVT_FLAGS, 1, 'eigener Termin ohne Teilnehmer ist verschiebbar');
+                assert.strictEqual(ev.EVT_FLAGS & 1, 1, 'eigener Termin ohne Teilnehmer ist verschiebbar');
+                assert.strictEqual(ev.EVT_FLAGS & 8, 8, 'Verschieben am Handy an');
 
                 // 1 Tag später -> PATCH; 1 Stunde später (nicht freigegeben) -> abgelehnt
                 sent = [];
