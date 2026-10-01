@@ -26,9 +26,9 @@
 #define DAY_ANIM_MS  220
 
 #if defined(PBL_PLATFORM_EMERY)
-  #define CARD_GAP   8   // ~1 mm Luft zwischen den Terminen (Pebble Time 2, ~200 ppi)
+  #define CARD_GAP   4   // ~0,5 mm Luft zwischen den Terminen (Pebble Time 2, ~200 ppi)
 #else
-  #define CARD_GAP   5
+  #define CARD_GAP   3
 #endif
 #define CARD_MARGIN  4   // Abstand Rahmen <-> Displayrand
 #define CARD_RADIUS  4
