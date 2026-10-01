@@ -6,12 +6,16 @@ var messageKeys = require('message_keys');
 var lib = require('./lib');
 var i18n = require('./i18n');
 var configPage = require('./config');
+var demo = require('./demo');
 
 // --- Configuration ----------------------------------------------------------
 // Client ID of the Entra app registration (see README.md).
 var CLIENT_ID = '402716d7-8b06-443b-af50-c37348a787c4';
 // 'common' = all account types; for personal use this can be your own tenant ID.
 var AUTHORITY = 'common';
+// Demo mode for screenshots: sample events in English, no sign-in, no network.
+// Never publish with true - tools/screenshots.sh switches it on only for its build.
+var DEMO = false;
 
 var SCOPE_READ = 'https://graph.microsoft.com/Calendars.Read offline_access';
 // Only when "Move events" is enabled (incremental consent)
@@ -50,6 +54,14 @@ function applyLanguage(settings) {
 
 function getSettings() {
   var settings = lib.mergeSettings(load('settings', null));
+  if (DEMO) {
+    // Screenshots: English, and moving on until the settings are saved once
+    if (settings.language === 'auto') settings.language = 'en';
+    if (!load('settings', null)) {
+      settings.moveEnabled = true;
+      settings.moveOptions = 27;  // 1 hour, 1 day, 1 week, next Monday
+    }
+  }
   applyLanguage(settings);
   return settings;
 }
@@ -234,6 +246,11 @@ function sendEvents(events, listDay, listDays) {
 // --- HTTP -------------------------------------------------------------------
 
 function request(method, url, headers, body, callback) {
+  if (DEMO) {
+    var answer = demo.handle(method, url, body);
+    setTimeout(function() { callback(answer[0], answer[1]); }, 50);
+    return;
+  }
   var xhr = new XMLHttpRequest();
   var finished = false;
   function finish(status, text) {
@@ -283,6 +300,10 @@ function storeTokens(json) {
 
 // callback(err, accessToken); err = {code, text}
 function getToken(callback) {
+  if (DEMO) {
+    callback(null, 'demo');
+    return;
+  }
   if (CLIENT_ID === 'TODO') {
     callback({ code: STATUS.CONFIG, text: i18n.t('noClientId') });
     return;
@@ -595,7 +616,7 @@ function openConfig() {
 
 Pebble.addEventListener('showConfiguration', function() {
   var auth = getAuth();
-  if (CLIENT_ID === 'TODO' || !auth || !auth.refresh) {
+  if (!DEMO && (CLIENT_ID === 'TODO' || !auth || !auth.refresh)) {
     openConfig();
     return;
   }

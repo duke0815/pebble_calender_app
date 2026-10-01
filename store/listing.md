@@ -29,7 +29,7 @@ See your Microsoft 365 and Outlook.com calendar on your Pebble.
 
 **Works with:** personal Microsoft accounts (outlook.com, hotmail.com, live.com) and most small organizations. Many larger companies block third-party apps or this sign-in method – in that case the app cannot be used with your work account.
 
-Optimized for Pebble Time 2, also runs on Pebble Time, Pebble Time Steel and Pebble 2.
+Optimized for Pebble Time 2, also runs on Pebble 2 Duo, Pebble Time, Pebble Time Steel and Pebble 2.
 
 Not affiliated with or endorsed by Microsoft. Office 365, Microsoft 365 and Outlook are trademarks of Microsoft Corporation.
 
@@ -38,9 +38,12 @@ Not affiliated with or endorsed by Microsoft. Office 365, Microsoft 365 and Outl
 - Privacy policy: docs/privacy.md
 - Source: https://github.com/duke0815/pebble_calender_app
 
-## Screenshots (to do)
-1. Day view (emery, default colors)
-2. Day view with custom colors
+## Screenshots
+Taken with `sh tools/screenshots.sh` (demo mode with neutral English sample data, saved to `store/screenshots/`), per platform:
+1. Day view of today
+2. Selected event
 3. Event details with description
-4. Move dialog
-5. Sign-in code
+4. Move options
+5. Tomorrow
+
+Optional: run `pebble emu-app-config --emulator emery` during the script and change the colors for an extra color screenshot.

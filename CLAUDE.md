@@ -14,7 +14,7 @@ Pebble watchapp that shows Office 365 calendar events day by day (day view, swip
 - Run the tests before every commit (see "Architecture").
 
 ## Platform & tooling
-- Target device: Pebble Time 2 (`emery`, 200×228, color). Also built for `basalt` and `diorite`; layout is computed relative to layer bounds, not fixed pixels.
+- Target device: Pebble Time 2 (`emery`, 200×228, color, touch). Also built for `basalt`, `diorite` and `flint` (Pebble 2 Duo, 144×168, black/white, no touch – like diorite); layout is computed relative to layer bounds, not fixed pixels. Platform-specific sizes only via `PBL_PLATFORM_EMERY` (everything else uses the smaller values).
 - Pebble SDK: C (watch) + PebbleKit JS (phone) + Clay (settings page).
 - Development on Windows → run the Pebble SDK in WSL2 (`uv tool install pebble-tool`, then `pebble sdk install latest`).
 - No heavy JS dependencies besides Clay (`pebble-clay`).
@@ -39,12 +39,15 @@ src/pkjs/index.js    PebbleKit JS: control flow, auth, Graph, sending to the wat
 src/pkjs/lib.js      Pure logic (times, filters, truncation, error classification) – testable with Node
 src/pkjs/config.js   Clay configuration (built dynamically)
 src/pkjs/i18n.js     Texts for status messages and the settings page (German/English)
+src/pkjs/demo.js     Demo mode: fake Graph with neutral English sample events (for screenshots)
+tools/screenshots.sh Builds the demo version, takes emulator screenshots, rebuilds the normal version
 test/lib.test.js     Node tests for lib.js + config.js
 test/index.sim.js    Simulation of index.js (Pebble/XHR/localStorage mocked)
 test/c/run.sh        C compile with SDK flags (-std=c99 -Os -Werror, -fshort-enums like ARM) against a stub pebble.h + native logic tests
 docs/help.md         User help (linked from the store)
 docs/privacy.md      Privacy policy
 store/listing.md     Store texts
+store/screenshots/   Store screenshots (from tools/screenshots.sh)
 ```
 
 Before every commit: `TZ=Europe/Vienna node test/lib.test.js && TZ=Europe/Vienna node test/index.sim.js && sh test/c/run.sh`. The stub (`test/c/stub/pebble.h`) must be extended for new SDK calls – with the real signatures.
@@ -61,6 +64,7 @@ Time calculations on the watch only via `time_make_local()` / `time_day_start()`
 - The code is shown **on the watch**: "microsoft.com/devicelogin – Code: XXXXXX". Sign-in starts automatically on app start when there is no token. There is **no menu entry** for it; switching accounts = "Sign out" in the settings, then reopen the app. The app must stay open during sign-in (PebbleKit JS only runs while the watchapp runs).
 - Access token + refresh token + expiry in `localStorage` (PebbleKit JS). Refresh when less than 5 minutes remain.
 - `invalid_grant` / `interaction_required` → delete tokens, watch shows "Please reopen the app to sign in." (sign-in starts automatically on the next start).
+- **Demo mode** (`var DEMO = false;` in `index.js`): `getToken` returns a dummy token and `request()` is answered by `demo.js` (calendars, calendarView, description, PATCH in memory) – the rest of the pipeline is the real one. Language "auto" becomes English, moving is on until settings are saved. Only `tools/screenshots.sh` switches it on for its build; a test checks that the committed code has `DEMO = false`. Keep the sample data neutral (no real names/companies).
 - Client ID as a constant in `src/pkjs/index.js`: `402716d7-8b06-443b-af50-c37348a787c4` (public client, not a secret). If it says `TODO`, the watch shows "Client ID missing".
 
 ## Microsoft Graph
@@ -219,7 +223,7 @@ Positioning for publication: primarily personal accounts and small organizations
 6. ✅ Several calendars; day view with paging by touch (replaces the "Today only"/"Next N" modes)
 7. ✅ Daily briefing via wakeup
 8. ✅ Error states (first version) – fine-tuning after testing on real hardware
-9. ✅ Moving events, colors, English, auto close
+9. ✅ Moving events, colors, English, auto close, flint, demo mode for screenshots
 
 Status: built by the owner with the real SDK and **tested in daily use on the Pebble Time 2** (display, touch, description, colors, language, moving own events with and without attendees work). The Claude build environment has no access to the SDK server: there C is compiled against the stub header and JS is checked with Node tests – build errors from the real SDK therefore only show up for the owner.
 
@@ -227,7 +231,7 @@ Status: built by the owner with the real SDK and **tested in daily use on the Pe
 - Publisher verification in Entra ID (Microsoft partner ID) – a precondition for users in other tenants to consent themselves at all.
 - Store description: clear note on the limitations with work accounts (see above) – `store/listing.md`.
 - Privacy policy: no data processing by the developer, everything stays on the device – `docs/privacy.md`.
-- Screenshots (emery), possibly add the `flint` platform (Pebble 2 Duo).
+- Screenshots: `sh tools/screenshots.sh` (run by the owner – the SDK is not reachable from the Claude environment).
 
 ## App name
 - **"Calendar for Office 365"** (`displayName` in `package.json`, heading of the settings page, README). "Office 365" is a Microsoft trademark – phrase it clearly as "for" in the store text (not an official Microsoft product).

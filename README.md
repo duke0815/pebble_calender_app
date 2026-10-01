@@ -87,6 +87,15 @@ Settings (calendars, language, colors, briefing, moving events) are in the Pebbl
 | Company policy blocks this sign-in | Conditional Access blocks the device code flow; no workaround |
 | Offline - as of HH:MM | Phone or internet not reachable; cached events are shown |
 
+## Screenshots (demo mode)
+
+```bash
+sh tools/screenshots.sh            # emery basalt diorite flint
+sh tools/screenshots.sh emery      # one platform
+```
+
+Builds a version with neutral English sample events (no sign-in, no network: `DEMO = true` in `src/pkjs/index.js`, data in `src/pkjs/demo.js`), installs it in the emulator and saves a screenshot after each step to `store/screenshots/`. Afterwards it switches demo mode off and builds the normal version again.
+
 ## Tests
 
 ```bash

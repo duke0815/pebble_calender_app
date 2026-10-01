@@ -284,6 +284,52 @@ test('Moving: permission, times, Graph body', function() {
   assert.strictEqual(applied.settings.moveOptions, 9);
 });
 
+test('demo: sample events run through the normal pipeline', function() {
+  var demo = require('../src/pkjs/demo');
+  var settings = lib.mergeSettings({ moveEnabled: true });
+  var now = new Date(2026, 9, 1, 9, 15);  // Thu Oct 1 2026
+  var win = lib.queryWindow(now, 2);
+  var url = 'https://graph.microsoft.com/v1.0/me/calendar/calendarView?startDateTime=' +
+            encodeURIComponent(win.start.toISOString()) + '&endDateTime=' + encodeURIComponent(win.end.toISOString());
+  var r = demo.handle('GET', url, null, now);
+  assert.strictEqual(r[0], 200);
+  var events = lib.selectEvents(r[1].value.map(lib.normalizeEvent), settings, win);
+  var today = events.filter(function(e) { return e.start < local(2026, 10, 2); });
+  assert.strictEqual(today.length, 6);
+  assert.strictEqual(today[0].allDay, true);
+  assert.strictEqual(today[0].title, 'Project deadline');
+  assert.strictEqual(today[1].start, local(2026, 10, 1, 8, 30));
+  assert.strictEqual(events.length, 10);
+  // own event without attendees is movable, invitation is not
+  var dentist = events.filter(function(e) { return e.title === 'Dentist appointment'; })[0];
+  var standup = events.filter(function(e) { return e.title === 'Team stand-up'; })[0];
+  assert.ok(lib.isMovable(dentist, settings));
+  assert.ok(!lib.isMovable(standup, settings));
+  // Teams block is cut from the description
+  assert.strictEqual(standup.notes, 'Yesterday, today, blockers. Keep it short.');
+  // Description fallback and moving (+1 day)
+  var noteUrl = 'https://graph.microsoft.com/v1.0/me/events/' + encodeURIComponent(dentist.id) + '?$select=bodyPreview';
+  assert.strictEqual(demo.handle('GET', noteUrl, null, now)[1].bodyPreview, 'Bring insurance card.');
+  var patch = demo.handle('PATCH', noteUrl.split('?')[0], JSON.stringify(lib.graphMoveBody(dentist, 1)), now);
+  assert.strictEqual(patch[0], 200);
+  var after = demo.handle('GET', url, null, now)[1].value.map(lib.normalizeEvent).filter(function(e) {
+    return e.title === 'Dentist appointment';
+  });
+  assert.strictEqual(after.length, 1);
+  assert.strictEqual(after[0].start, local(2026, 10, 2, 15, 0));
+  // Other days and weekends have events too, other calendars are empty
+  var sat = lib.queryWindow(new Date(2026, 9, 3), 1);
+  var satUrl = 'https://graph.microsoft.com/v1.0/me/calendar/calendarView?startDateTime=' +
+               encodeURIComponent(sat.start.toISOString()) + '&endDateTime=' + encodeURIComponent(sat.end.toISOString());
+  assert.strictEqual(demo.handle('GET', satUrl, null, now)[1].value[0].subject, 'Farmers market');
+  assert.strictEqual(demo.handle('GET', satUrl.replace('/me/calendar/', '/me/calendars/other/'), null, now)[1].value.length, 0);
+});
+
+test('demo mode is off in the published code', function() {
+  var src = require('fs').readFileSync(require('path').join(__dirname, '../src/pkjs/index.js'), 'utf8');
+  assert.ok(/\nvar DEMO = false;/.test(src), 'DEMO must be false');
+});
+
 var failed = 0;
 tests.forEach(function(t) {
   try {
