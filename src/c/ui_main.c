@@ -24,14 +24,11 @@
 #define PAD_X        6
 #define PAD_Y        2
 #define HEADER_H     (H_TIME + 4)
-#define ACTION_ROW_H 44
 #define INFO_ROW_H   (H_TITLE * 3 + 2 * PAD_Y)
 
 #define COLOR_ACCENT PBL_IF_COLOR_ELSE(GColorCobaltBlue, GColorBlack)
 #define COLOR_BAR    PBL_IF_COLOR_ELSE(GColorOxfordBlue, GColorBlack)
 #define COLOR_PAST   PBL_IF_COLOR_ELSE(GColorDarkGray, GColorBlack)
-
-enum { ACTION_REFRESH = 0, ACTION_LOGIN, ACTION_COUNT };
 
 static Window *s_window;
 static TextLayer *s_status_layer;
@@ -45,29 +42,20 @@ static void prv_interaction(void) {
   if (s_callbacks.interaction) s_callbacks.interaction();
 }
 
-// Sections: [Termin-Tage | Info-Section, wenn leer] + Aktionen
-static uint16_t prv_event_sections(void) {
-  uint16_t n = events_view_num_sections();
-  return n > 0 ? n : 1;
-}
-
+// Sections: Termin-Tage, oder eine Info-Section, wenn nichts sichtbar ist
 static bool prv_is_info_section(uint16_t section) {
   return events_view_num_sections() == 0 && section == 0;
-}
-
-static bool prv_is_action_section(uint16_t section) {
-  return section == prv_event_sections();
 }
 
 // ---------------------------------------------------------------------------
 // MenuLayer-Callbacks
 
 static uint16_t prv_num_sections(MenuLayer *menu, void *ctx) {
-  return prv_event_sections() + 1;
+  uint16_t n = events_view_num_sections();
+  return n > 0 ? n : 1;
 }
 
 static uint16_t prv_num_rows(MenuLayer *menu, uint16_t section, void *ctx) {
-  if (prv_is_action_section(section)) return ACTION_COUNT;
   if (prv_is_info_section(section)) return 1;
   return events_view_num_rows(section);
 }
@@ -77,7 +65,6 @@ static int16_t prv_header_height(MenuLayer *menu, uint16_t section, void *ctx) {
 }
 
 static int16_t prv_cell_height(MenuLayer *menu, MenuIndex *index, void *ctx) {
-  if (prv_is_action_section(index->section)) return ACTION_ROW_H;
   if (prv_is_info_section(index->section)) return INFO_ROW_H;
   const CalEvent *e = events_view_get(index->section, index->row);
   int16_t h = 2 * PAD_Y + H_TIME + H_TITLE;
@@ -88,9 +75,7 @@ static int16_t prv_cell_height(MenuLayer *menu, MenuIndex *index, void *ctx) {
 static void prv_draw_header(GContext *ctx, const Layer *cell, uint16_t section, void *data) {
   GRect bounds = layer_get_bounds(cell);
   char text[32];
-  if (prv_is_action_section(section)) {
-    snprintf(text, sizeof(text), "Aktionen");
-  } else if (prv_is_info_section(section)) {
+  if (prv_is_info_section(section)) {
     format_day(time_day_start(time(NULL)), text, sizeof(text));
   } else {
     format_day(events_view_section_day(section), text, sizeof(text));
@@ -139,10 +124,7 @@ static void prv_draw_info(GContext *ctx, const Layer *cell) {
 }
 
 static void prv_draw_row(GContext *ctx, const Layer *cell, MenuIndex *index, void *data) {
-  if (prv_is_action_section(index->section)) {
-    menu_cell_basic_draw(ctx, cell, index->row == ACTION_REFRESH ? "Aktualisieren" : "Anmelden",
-                         NULL, NULL);
-  } else if (prv_is_info_section(index->section)) {
+  if (prv_is_info_section(index->section)) {
     prv_draw_info(ctx, cell);
   } else {
     const CalEvent *e = events_view_get(index->section, index->row);
@@ -152,16 +134,7 @@ static void prv_draw_row(GContext *ctx, const Layer *cell, MenuIndex *index, voi
 
 static void prv_select(MenuLayer *menu, MenuIndex *index, void *data) {
   prv_interaction();
-  if (prv_is_action_section(index->section)) {
-    if (index->row == ACTION_REFRESH) {
-      if (s_callbacks.refresh) s_callbacks.refresh();
-    } else {
-      if (s_callbacks.login) s_callbacks.login();
-    }
-    return;
-  }
   if (prv_is_info_section(index->section)) {
-    if (s_callbacks.refresh) s_callbacks.refresh();
     return;
   }
   const CalEvent *e = events_view_get(index->section, index->row);

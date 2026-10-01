@@ -10,7 +10,6 @@
 #define MSG_SETTINGS     5
 // MSG_TYPE: Uhr -> Handy
 #define MSG_REQUEST      10
-#define MSG_LOGIN        11
 
 // STATUS_CODE
 #define STATUS_SYNCING        1

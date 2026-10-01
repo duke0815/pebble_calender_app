@@ -252,7 +252,7 @@ function schedulePoll() {
 function pollToken() {
   if (!login) return;
   if (Date.now() > login.expiresAt) {
-    finishLogin({ code: STATUS.NEED_LOGIN, text: 'Code abgelaufen. Bitte neu anmelden.' });
+    finishLogin({ code: STATUS.NEED_LOGIN, text: 'Code abgelaufen. App neu öffnen.' });
     return;
   }
   postForm(LOGIN_BASE + 'token', {
@@ -363,7 +363,7 @@ function fetchEvents(token, settings, callback) {
         return;
       }
       if (status !== 200) {
-        callback(status === 401 ? { code: STATUS.NEED_LOGIN, text: 'Bitte neu anmelden.' }
+        callback(status === 401 ? { code: STATUS.NEED_LOGIN, text: 'Bitte App neu öffnen zum Anmelden.' }
                                 : lib.graphErrorStatus(status));
         return;
       }
@@ -378,7 +378,6 @@ function fetchEvents(token, settings, callback) {
 // --- Synchronisierung -------------------------------------------------------
 
 var syncing = false;
-var syncAgain = false;
 
 function sync() {
   if (syncing) {
@@ -393,10 +392,6 @@ function sync() {
   function done(err) {
     syncing = false;
     if (err) sendStatus(err.code, err.text);
-    if (syncAgain) {
-      syncAgain = false;
-      sync();
-    }
   }
 
   getToken(function(err, token) {
@@ -416,20 +411,6 @@ function sync() {
       }
     });
   });
-}
-
-// Menüpunkt "Anmelden" auf der Uhr: neue Anmeldung erzwingen (z. B. Kontowechsel)
-function forceLogin() {
-  if (login) {
-    sendLoginCode();
-    return;
-  }
-  clearAuth();
-  if (syncing) {
-    syncAgain = true;
-  } else {
-    sync();
-  }
 }
 
 // --- Einstellungen (Clay) ---------------------------------------------------
@@ -495,7 +476,7 @@ Pebble.addEventListener('webviewclosed', function(e) {
     clearAuth();
     sendSettings(applied.settings);
     sendEvents([]);
-    sendStatus(STATUS.NEED_LOGIN, 'Abgemeldet. "Anmelden" wählen.');
+    sendStatus(STATUS.NEED_LOGIN, 'Abgemeldet. App neu öffnen zum Anmelden.');
     return;
   }
   sync();
@@ -511,13 +492,13 @@ function payloadValue(payload, name) {
 
 Pebble.addEventListener('appmessage', function(e) {
   var type = payloadValue(e.payload || {}, 'MSG_TYPE');
+  // REQUEST kommt nur noch, wenn das Briefing bei bereits offener App fällig wird.
   if (type === MSG.REQUEST) {
     sync();
-  } else if (type === MSG.LOGIN) {
-    forceLogin();
   }
 });
 
+// Genau eine Synchronisierung pro App-Start.
 Pebble.addEventListener('ready', function() {
   sync();
 });

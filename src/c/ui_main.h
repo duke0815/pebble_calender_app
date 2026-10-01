@@ -2,8 +2,6 @@
 #include <pebble.h>
 
 typedef struct {
-  void (*refresh)(void);       // Menüpunkt "Aktualisieren"
-  void (*login)(void);         // Menüpunkt "Anmelden"
   void (*interaction)(void);   // jede Benutzeraktion (für Inaktivitäts-Timer)
 } UiMainCallbacks;
 

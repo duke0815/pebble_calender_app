@@ -54,7 +54,8 @@ Einstellungen (Kalender, Modus, Briefing) findest du in der Pebble-App am Handy 
 
 - **Liste:** Termine nach Tagen gruppiert, vergangene grau. Oben steht der Stand der letzten Synchronisierung oder „Offline“.
 - **Select auf einem Termin:** Detailansicht.
-- **Ganz unten, „Aktionen“:** Aktualisieren, Anmelden (z. B. Kontowechsel).
+- **Aktualisieren:** automatisch einmal beim Öffnen der App.
+- **Konto wechseln:** in den Einstellungen „Abmelden“, dann die App neu öffnen.
 - **Briefing:** Zur eingestellten Zeit startet die App, vibriert, lädt frische Daten (sonst Cache) und schließt sich nach 60 s ohne Bedienung wieder.
 
 ## Fehlermeldungen
@@ -63,7 +64,7 @@ Einstellungen (Kalender, Modus, Briefing) findest du in der Pebble-App am Handy 
 |---|---|
 | Client-ID fehlt | `CLIENT_ID` in `src/pkjs/index.js` eintragen |
 | App-Registrierung fehlerhaft | „Öffentliche Clientflows zulassen“ nicht aktiviert oder falsche Client-ID |
-| Bitte neu anmelden | Token abgelaufen oder widerrufen → „Anmelden“ wählen |
+| Bitte App neu öffnen zum Anmelden | Token abgelaufen oder widerrufen → App schließen und neu öffnen, dann startet der Login |
 | Deine Firmen-IT muss die App freigeben | Admin-Zustimmung nötig (AADSTS65001/90094) |
 | Firmenrichtlinie blockiert diese Anmeldung | Conditional Access sperrt den Device Code Flow, kein Workaround |
 | Offline – Stand HH:MM | Handy oder Internet nicht erreichbar, es wird der Cache angezeigt |

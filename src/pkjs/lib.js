@@ -7,8 +7,7 @@ var MSG = {
   STATUS: 3,
   LOGIN_CODE: 4,
   SETTINGS: 5,
-  REQUEST: 10,
-  LOGIN: 11
+  REQUEST: 10
 };
 
 var STATUS = {
@@ -233,7 +232,7 @@ function classifyAuthError(json) {
   if (json.error === 'invalid_grant' || json.error === 'interaction_required' ||
       json.error === 'expired_token' || json.error === 'authorization_declined' ||
       json.error === 'bad_verification_code') {
-    return { code: STATUS.NEED_LOGIN, text: 'Bitte neu anmelden.', clearTokens: true };
+    return { code: STATUS.NEED_LOGIN, text: 'Bitte App neu öffnen zum Anmelden.', clearTokens: true };
   }
   if (json.error === 'invalid_client' || json.error === 'unauthorized_client') {
     return { code: STATUS.CONFIG, text: 'App-Registrierung fehlerhaft (Client-ID).', clearTokens: true };

@@ -120,9 +120,6 @@ static void prv_request_refresh(void) {
   prv_send(MSG_REQUEST, s_wakeup_launch ? WAKEUP_SYNC_TIMEOUT_MS : SYNC_TIMEOUT_MS);
 }
 
-static void prv_request_login(void) {
-  prv_send(MSG_LOGIN, SYNC_TIMEOUT_MS);
-}
 
 // ---------------------------------------------------------------------------
 // Inaktivität (nur beim Start durch das Briefing)
@@ -196,11 +193,22 @@ static void prv_send_failed(void) {
 // ---------------------------------------------------------------------------
 // Wakeup & Tick
 
+// Beim App-Start synchronisiert PebbleKit JS genau einmal von selbst ("ready").
+// Die Uhr wartet nur darauf und zeigt bis dahin den Cache.
+static void prv_await_startup_sync(void) {
+  if (!connection_service_peek_pebble_app_connection()) {
+    prv_set_state(STATE_OFFLINE);
+    return;
+  }
+  prv_set_state(STATE_SYNCING);
+  prv_arm_sync_timer(s_wakeup_launch ? WAKEUP_SYNC_TIMEOUT_MS : SYNC_TIMEOUT_MS);
+}
+
 static void prv_briefing_start(void) {
   s_wakeup_launch = true;
   vibes_short_pulse();
   prv_interaction();
-  prv_request_refresh();
+  prv_await_startup_sync();
 }
 
 static void prv_wakeup_handler(WakeupId id, int32_t cookie) {
@@ -230,8 +238,6 @@ static void prv_init(void) {
   });
 
   ui_main_push((UiMainCallbacks) {
-    .refresh = prv_request_refresh,
-    .login = prv_request_login,
     .interaction = prv_interaction,
   });
   ui_main_reload(true);
@@ -245,7 +251,7 @@ static void prv_init(void) {
   if (launch_reason() == APP_LAUNCH_WAKEUP) {
     prv_briefing_start();
   } else {
-    prv_request_refresh();
+    prv_await_startup_sync();
   }
 }
 

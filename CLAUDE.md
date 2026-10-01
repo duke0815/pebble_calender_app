@@ -48,9 +48,9 @@ Zeitberechnung auf der Uhr nur über `time_make_local()` / `time_day_start()` (k
   - `POST https://login.microsoftonline.com/{AUTHORITY}/oauth2/v2.0/token` (Polling im angegebenen Intervall, `slow_down` → +5 s)
   - `AUTHORITY` als Konstante: Standard `common`; für Eigengebrauch kann die eigene Tenant-ID eingetragen werden.
 - Scopes: `https://graph.microsoft.com/Calendars.Read offline_access`
-- Anzeige des Codes **auf der Uhr**: „microsoft.com/devicelogin – Code: XXXXXX“. Login startet automatisch, wenn kein Token vorhanden ist, oder über den Menüpunkt „Anmelden“ auf der Uhr (erzwingt neue Anmeldung, z. B. Kontowechsel). Während des Logins muss die App offen bleiben (PebbleKit JS läuft nur, solange die Watchapp läuft).
+- Anzeige des Codes **auf der Uhr**: „microsoft.com/devicelogin – Code: XXXXXX“. Login startet automatisch beim App-Start, wenn kein Token vorhanden ist. Es gibt **keinen Menüpunkt** dafür; Kontowechsel = in den Einstellungen „Abmelden“, dann App neu öffnen. Während des Logins muss die App offen bleiben (PebbleKit JS läuft nur, solange die Watchapp läuft).
 - Access Token + Refresh Token + Ablaufzeit in `localStorage` (PebbleKit JS). Erneuern, wenn weniger als 5 Minuten Restlaufzeit.
-- `invalid_grant` / `interaction_required` → Tokens löschen, Uhr zeigt „Bitte neu anmelden“.
+- `invalid_grant` / `interaction_required` → Tokens löschen, Uhr zeigt „Bitte App neu öffnen zum Anmelden.“ (beim nächsten Start startet der Login automatisch).
 - Client-ID als Konstante in `src/pkjs/index.js`: `402716d7-8b06-443b-af50-c37348a787c4` (Public Client, kein Geheimnis). Steht dort `TODO`, zeigt die Uhr „Client-ID fehlt“.
 
 ## Microsoft Graph
@@ -91,7 +91,7 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 
 | Key | Typ | Inhalt |
 |---|---|---|
-| `MSG_TYPE` | int | Handy→Uhr: 1 = Termin, 2 = Ende der Liste, 3 = Status/Fehler, 4 = Login-Code, 5 = Settings. Uhr→Handy: 10 = REQUEST (Daten anfordern), 11 = LOGIN (Neuanmeldung erzwingen) |
+| `MSG_TYPE` | int | Handy→Uhr: 1 = Termin, 2 = Ende der Liste, 3 = Status/Fehler, 4 = Login-Code, 5 = Settings. Uhr→Handy: 10 = REQUEST (Daten anfordern) |
 | `EVT_INDEX` / `EVT_COUNT` | int | Position / Gesamtzahl (`EVT_COUNT` auch bei MSG_TYPE 2) |
 | `EVT_START` / `EVT_END` | int32 | Epoch-Sekunden (ganztägig: lokale Mitternacht, s. o.) |
 | `EVT_ALLDAY` | int | 0/1 |
@@ -106,7 +106,8 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 | `SET_MODE` | int | 0 = Nur heute, 1 = Nächste N |
 | `SET_COUNT` | int | N (1–10) |
 
-- Die Uhr fordert beim Start Daten an (`MSG_TYPE = 10`). JS startet beim `ready`-Event ebenfalls eine Synchronisierung; parallele Anfragen werden in JS zusammengefasst.
+- **Genau eine Synchronisierung pro App-Start:** JS synchronisiert beim `ready`-Event; die Uhr sendet beim Start nichts, sondern wartet (Statuszeile „Aktualisiere...“, Timeout) und zeigt bis dahin den Cache. Kein manuelles Aktualisieren, kein periodisches Nachladen.
+- `MSG_TYPE = 10` sendet die Uhr nur, wenn das Briefing fällig wird, während die App bereits offen ist. Weitere Syncs gibt es nur nach dem Speichern der Einstellungen. Parallele Anfragen fasst JS zusammen.
 - Die Uhr übernimmt eine neue Liste nur, wenn bei `MSG_TYPE = 2` alle `EVT_COUNT` Termine angekommen sind – sonst bleibt der alte Cache.
 - Jede Nachricht außer 4 schließt das Login-Fenster auf der Uhr.
 - Texte für die Uhr kein „…“-Zeichen verwenden, sondern `...` (Font-Abdeckung).
@@ -115,8 +116,8 @@ Termine **einzeln** senden (Message-Größenlimit), mit Warteschlange und ACK/NA
 - Statuszeile oben: „Stand HH:MM“, „Aktualisiere...“, „Offline · Stand HH:MM“ oder Fehlertext.
 - `MenuLayer` darunter, eigene Zeilenzeichnung: Uhrzeit-Spanne (bzw. „Ganztägig“), Titel, Ort. Vergangene Termine grau.
 - Tagesüberschriften als Sections („Heute · Mi 01.10.“, „Morgen · …“, „Fr 03.10.“). Termine, die vor heute begonnen haben, erscheinen unter „Heute“.
-- Letzte Section „Aktionen“: „Aktualisieren“, „Anmelden“.
-- Select auf einem Termin → Detailfenster (Datum, Zeit, voller Titel, Ort).
+- Keine Aktions-Einträge (kein „Aktualisieren“/„Anmelden“) – bewusst entfernt.
+- Select auf einem Termin → Detailfenster (Datum, Zeit, voller Titel, Ort). Schrift dort bewusst klein: emery Titel GOTHIC_24_BOLD, Zeit GOTHIC_18_BOLD, Rest GOTHIC_18 (andere Plattformen eine Stufe kleiner).
 - Minütlicher Tick → Ansicht neu berechnen (vergangene Termine, Tageswechsel).
 - **Cache:** jeder Termin unter eigenem Persist-Key (256-Byte-Limit pro Key) + Anzahl + Zeitstempel des letzten Syncs + Cache-Version. Beim Start sofort Cache anzeigen, dann aktualisieren.
 - **Speicherbudget:** Persistenter Speicher ist insgesamt ca. 4 KB pro App. Ein Termin belegt ~116 Byte → **max. 16 Termine** im Cache (~1,9 KB) plus Settings. Nicht erhöhen, ohne nachzurechnen.
