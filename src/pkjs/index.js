@@ -8,7 +8,7 @@ var configPage = require('./config');
 
 // --- Konfiguration ----------------------------------------------------------
 // Client-ID der Entra-App-Registrierung (siehe README.md).
-var CLIENT_ID = 'TODO';
+var CLIENT_ID = '402716d7-8b06-443b-af50-c37348a787c4';
 // 'common' = alle Kontotypen; für Eigengebrauch kann hier die eigene Tenant-ID stehen.
 var AUTHORITY = 'common';
 

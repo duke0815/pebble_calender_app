@@ -99,7 +99,7 @@ Module._load = function(request) {
 
 // index.js mit Test-Client-ID laden
 var file = path.join(__dirname, '../src/pkjs/index.js');
-var src = fs.readFileSync(file, 'utf8').replace("var CLIENT_ID = 'TODO';", "var CLIENT_ID = 'test-client';");
+var src = fs.readFileSync(file, 'utf8').replace(/var CLIENT_ID = '[^']*';/, "var CLIENT_ID = 'test-client';");
 var m = new Module(file, module);
 m.filename = file;
 m.paths = Module._nodeModulePaths(path.dirname(file));

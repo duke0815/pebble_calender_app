@@ -51,7 +51,7 @@ Zeitberechnung auf der Uhr nur über `time_make_local()` / `time_day_start()` (k
 - Anzeige des Codes **auf der Uhr**: „microsoft.com/devicelogin – Code: XXXXXX“. Login startet automatisch, wenn kein Token vorhanden ist, oder über den Menüpunkt „Anmelden“ auf der Uhr (erzwingt neue Anmeldung, z. B. Kontowechsel). Während des Logins muss die App offen bleiben (PebbleKit JS läuft nur, solange die Watchapp läuft).
 - Access Token + Refresh Token + Ablaufzeit in `localStorage` (PebbleKit JS). Erneuern, wenn weniger als 5 Minuten Restlaufzeit.
 - `invalid_grant` / `interaction_required` → Tokens löschen, Uhr zeigt „Bitte neu anmelden“.
-- Client-ID als Konstante: `CLIENT_ID = "TODO"`. Solange `TODO` drinsteht, zeigt die Uhr „Client-ID fehlt“.
+- Client-ID als Konstante in `src/pkjs/index.js`: `402716d7-8b06-443b-af50-c37348a787c4` (Public Client, kein Geheimnis). Steht dort `TODO`, zeigt die Uhr „Client-ID fehlt“.
 
 ## Microsoft Graph
 - Kalenderliste: `GET /v1.0/me/calendars?$select=id,name,isDefaultCalendar` → in `localStorage` cachen (max. 1×/Tag automatisch erneuern, sonst beim Öffnen der Einstellungen).
@@ -172,4 +172,3 @@ Code ist geschrieben, aber noch **nicht mit dem echten SDK gebaut und nicht auf 
 
 ## Offene Punkte
 - App-Name (Arbeitstitel: „O365 Kalender“)
-- Client-ID der Entra-App-Registrierung
