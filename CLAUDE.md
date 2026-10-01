@@ -209,7 +209,7 @@ Positionierung bei Veröffentlichung: primär Privatkonten und kleine Firmen, ni
 7. ✅ Tägliches Briefing per Wakeup
 8. ✅ Fehlerzustände (erste Fassung) – Feinschliff nach Test auf echter Hardware
 
-Code ist geschrieben, aber noch **nicht mit dem echten SDK gebaut und nicht auf der Uhr getestet** (Build-Umgebung hatte keinen Zugriff auf den SDK-Server). C wurde gegen einen Stub-Header syntaktisch geprüft, JS-Logik per Node-Tests.
+Stand: Vom Projektinhaber mit dem echten SDK gebaut und **auf der Pebble Time 2 im Alltag getestet** (Anzeige, Touch, Beschreibung, Farben, Sprache, Verschieben eigener Termine mit und ohne Teilnehmer funktionieren). Die Claude-Build-Umgebung hat keinen Zugriff auf den SDK-Server: dort wird C gegen den Stub-Header kompiliert und JS per Node-Tests geprüft – Build-Fehler aus dem echten SDK kommen daher erst beim Projektinhaber zum Vorschein.
 
 ## Vor der Store-Veröffentlichung
 - Publisher-Verifizierung in Entra ID (Microsoft-Partner-ID) – Voraussetzung, dass Nutzer in fremden Tenants überhaupt selbst zustimmen können.
