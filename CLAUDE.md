@@ -169,3 +169,10 @@ Code ist geschrieben, aber noch **nicht mit dem echten SDK gebaut und nicht auf 
 ## Offene Punkte
 - App-Name (Arbeitstitel: „O365 Kalender“)
 - Client-ID der Entra-App-Registrierung
+
+## Idee für Version 2: Kalender vom Handy statt Graph
+- PebbleKit JS hat keinen Zugriff auf den Handy-Kalender → nur über eine **native Android-Begleit-App** (PebbleKit Android) möglich, die `CalendarContract` liest und dieselben AppMessages (MSG_TYPE 1/2/3/5) an die Uhr schickt. Watchapp bleibt weitgehend gleich.
+- Vorteil: keine Entra-Registrierung, kein Consent, keine Device-Code-Sperre; jeder Kalender, der im Android-Kalender landet (Outlook mit „Kalender synchronisieren“, Google, Exchange ActiveSync, CalDAV-Sync).
+- Grenzen: Android-only (iOS praktisch nicht machbar); Intune-Richtlinien sperren oft die Outlook→Android-Kalender-Synchronisierung (gleiche Konzerne wie bei Graph); zweite App + Play-Store-Eintrag nötig; Abhängigkeit von PebbleKit-Android-Unterstützung der aktuellen Pebble-App.
+- Vorab-Check ohne Code: In Outlook für Android „Kalender synchronisieren“ aktivieren und prüfen, ob die Termine (auch Firmenkonto) im System-Kalender erscheinen.
+- Erst angehen, wenn Version 1 auf echter Hardware läuft.
