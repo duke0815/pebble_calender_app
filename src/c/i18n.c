@@ -54,6 +54,7 @@ static const char *const STRINGS[2][STR_COUNT] = {
     [STR_RESPOND_FAILED] = "Antworten fehlgeschlagen",
     [STR_RESPONSE_STATUS] = "Deine Antwort: %s",
     [STR_RESPONSE_NONE] = "Noch nicht beantwortet",
+    [STR_RESPOND_OFF] = "Einladung: Antworten in den Einstellungen einschalten",
   },
   [LANG_EN] = {
     [STR_TODAY] = "Today",
@@ -107,6 +108,7 @@ static const char *const STRINGS[2][STR_COUNT] = {
     [STR_RESPOND_FAILED] = "Response failed",
     [STR_RESPONSE_STATUS] = "Your response: %s",
     [STR_RESPONSE_NONE] = "Not responded yet",
+    [STR_RESPOND_OFF] = "Invitation: turn on responding in the settings",
   },
 };
 

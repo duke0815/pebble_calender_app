@@ -136,7 +136,10 @@ const char *ui_action_reason(const CalEvent *event) {
   if (ui_action_available(event)) return NULL;
   if (!(event->flags & EVT_FLAG_MOVE_ENABLED)) return NULL;  // feature off: no hint
   if (settings_get()->move_opts == 0) return tr(STR_MOVE_NO_SETTINGS);
-  if (event->flags & EVT_FLAG_NOT_ORGANIZER) return tr(STR_MOVE_NOT_ORGANIZER);
+  if (event->flags & EVT_FLAG_NOT_ORGANIZER) {
+    // Invitation: point to the setting instead of only saying "cannot move"
+    return tr((event->flags & EVT_FLAG_RESPOND_ENABLED) ? STR_MOVE_NOT_ORGANIZER : STR_RESPOND_OFF);
+  }
   if (event->flags & EVT_FLAG_HAS_ATTENDEES) return tr(STR_MOVE_HAS_ATTENDEES);
   return tr(STR_MOVE_NO_OPTION);
 }

@@ -127,7 +127,7 @@ Send events **one by one** (message size limit), with a queue and ACK/NACK retry
 | `EVT_TITLE` | cstring | max. 80 chars **and** max. 95 bytes UTF-8, truncated in JS (`...`) |
 | `EVT_LOCATION` | cstring | max. 40 chars **and** max. 47 bytes UTF-8 |
 | `EVT_KEY` | int32 | Event key (with MSG_TYPE 1, 6, 12) |
-| `EVT_FLAGS` | int | with MSG_TYPE 1: bit 0 = movable, bit 1 = not organizer, bit 2 = has attendees, bit 3 = moving on at the phone, bit 4 = respondable, bits 5-6 = own response 0 none / 1 accepted / 2 tentative / 3 declined (`lib.eventFlags`) |
+| `EVT_FLAGS` | int | with MSG_TYPE 1: bit 0 = movable, bit 1 = not organizer, bit 2 = has attendees, bit 3 = moving on at the phone, bit 4 = respondable, bits 5-6 = own response 0 none / 1 accepted / 2 tentative / 3 declined, bit 7 = responding on at the phone (`lib.eventFlags`) |
 | `MOVE_OPT` | int | with MSG_TYPE 13: 0 = +1 hour, 1 = +1 day, 2 = +2 days, 3 = +1 week, 4 = next Monday (same time; event on a Monday → Monday a week later) |
 | `RESP_OPT` | int | with MSG_TYPE 14: 0 = accept, 1 = tentative, 2 = decline (`lib.RESPONSES`) |
 | `MOVE_OK` | int | with MSG_TYPE 7: 1 = done (moved/responded), 0 = error (text in `STATUS_TEXT`) |
@@ -189,6 +189,7 @@ Send events **one by one** (message size limit), with a queue and ACK/NACK retry
 
 ## Responding to invitations (opt-in)
 - Only when "Respond to invitations" is enabled. Respondable (`lib.isRespondable`): every event where the user is **not** the organizer. Own events are never respondable, invitations never movable – so the action menu has either the "Move" or the "Respond" section (the code supports both).
+- With moving on but responding off, the details of an invitation say "Invitation: turn on responding in the settings" (bit 7) instead of only "cannot move".
 - Own response from `responseStatus.response` → `EVT_FLAGS` bits 5-6. The detail view shows "Your response: Accepted" / "Not responded yet" and "Select: Respond".
 - Watch: Select → action menu section "Respond": Accept / Tentative / Decline ("Current response" as subtitle) → confirmation "Accept?\nThe organizer will be notified." → "Sending response..." → "Accepted" etc.; same timeouts/retry/close behavior as moving, result via MSG_TYPE 7.
 - Phone: checks permission again (`notes` index stores `respondable`), then `POST /me/events/{id}/{accept|tentativelyAccept|decline}` with `{"sendResponse": true}` (202). Then `sync(true)`; declined events disappear when "Hide declined events" is on.

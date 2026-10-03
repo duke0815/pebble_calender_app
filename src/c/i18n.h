@@ -57,6 +57,7 @@ typedef enum {
   STR_RESPOND_FAILED,
   STR_RESPONSE_STATUS,   // "%s" = response (Accepted/...)
   STR_RESPONSE_NONE,
+  STR_RESPOND_OFF,
   STR_COUNT
 } StrId;
 

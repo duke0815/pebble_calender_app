@@ -24,6 +24,7 @@
 #define EVT_FLAG_RESPONDABLE   16  // invitation that may be answered
 #define EVT_RESPONSE_SHIFT     5   // bits 5-6: own response (RESPONSE_*)
 #define EVT_RESPONSE_MASK      3
+#define EVT_FLAG_RESPOND_ENABLED 128  // responding is enabled on the phone
 
 // Own response to an invitation (from EVT_FLAGS)
 #define RESPONSE_NONE      0

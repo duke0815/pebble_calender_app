@@ -293,7 +293,7 @@ test('Responding to invitations: permission, flags, settings', function() {
   assert.strictEqual(lib.isRespondable(invite, lib.mergeSettings({})), false, 'off = never');
   assert.strictEqual(lib.isRespondable({ isOrganizer: true }, on), false, 'own events cannot be answered');
   // bit 4 respondable, bits 5-6 response; moving off -> no bit 3
-  assert.strictEqual(lib.eventFlags(invite, on), 2 | 4 | 16 | (2 << 5));
+  assert.strictEqual(lib.eventFlags(invite, on), 2 | 4 | 16 | (2 << 5) | 128);
   assert.strictEqual(lib.eventFlags(invite, lib.mergeSettings({})), 2 | 4 | (2 << 5));
   var none = lib.normalizeEvent({ id: 'j', responseStatus: { response: 'notResponded' },
     start: { dateTime: '2026-10-01T07:00:00' }, end: { dateTime: '2026-10-01T08:00:00' } });

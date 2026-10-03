@@ -305,7 +305,7 @@ function needsWriteAccess(settings) {
 
 // EVT_FLAGS for the watch: bit 0 movable; reasons why not (for the hint in the
 // detail view): bit 1 = not organizer, bit 2 = has attendees, bit 3 = moving enabled on the phone;
-// bit 4 = respondable, bits 5-6 = own response (RESPONSE_CODES)
+// bit 4 = respondable, bits 5-6 = own response (RESPONSE_CODES), bit 7 = responding enabled on the phone
 function eventFlags(e, settings) {
   var flags = 0;
   if (isMovable(e, settings)) flags |= 1;
@@ -314,6 +314,7 @@ function eventFlags(e, settings) {
   if (settings.moveEnabled) flags |= 8;
   if (isRespondable(e, settings)) flags |= 16;
   flags |= ((e.response || 0) & 3) << 5;
+  if (settings.respondEnabled) flags |= 128;
   return flags;
 }
 
