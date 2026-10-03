@@ -3,7 +3,7 @@
 #include "format.h"
 #include "i18n.h"
 #include "theme.h"
-#include "ui_move.h"
+#include "ui_action.h"
 #include "idle.h"
 
 #if defined(PBL_PLATFORM_EMERY)
@@ -22,7 +22,7 @@
 #define NOTE_SEND_RETRY_MS 250
 #define NOTE_SEND_TRIES 8
 
-enum { L_DATE, L_TIME, L_TITLE, L_LOCATION, L_MOVE_HINT, L_NOTES, L_COUNT };
+enum { L_DATE, L_TIME, L_TITLE, L_LOCATION, L_RESPONSE, L_MOVE_HINT, L_NOTES, L_COUNT };
 
 static Window *s_window;
 static ScrollLayer *s_scroll;
@@ -113,11 +113,11 @@ static void prv_note_request(void) {
   prv_note_send(NULL);
 }
 
-// Select opens the move dialog (if allowed); up/down still scroll
+// Select opens the action menu (move/respond, if allowed); up/down still scroll
 static void prv_select_click(ClickRecognizerRef recognizer, void *context) {
   idle_kick();
-  if (ui_move_available(&s_event)) {
-    ui_move_show(&s_event);
+  if (ui_action_available(&s_event)) {
+    ui_action_show(&s_event);
   }
 }
 
@@ -164,12 +164,15 @@ static void prv_window_load(Window *window) {
   if (s_event.location[0]) {
     y = prv_add_text(L_LOCATION, s_event.location, FONT_SMALL, y);
   }
-  if (ui_move_available(&s_event)) {
-    y = prv_add_text(L_MOVE_HINT, tr(STR_MOVE_HINT), FONT_SMALL, y + 2);
+  if (ui_action_response_text(&s_event)) {
+    y = prv_add_text(L_RESPONSE, ui_action_response_text(&s_event), FONT_SMALL, y);
+  }
+  if (ui_action_hint(&s_event)) {
+    y = prv_add_text(L_MOVE_HINT, ui_action_hint(&s_event), FONT_SMALL, y + 2);
     text_layer_set_text_color(s_layers[L_MOVE_HINT], PBL_IF_COLOR_ELSE(theme_accent(), theme_text()));
-  } else if (ui_move_reason(&s_event)) {
+  } else if (ui_action_reason(&s_event)) {
     // Moving is on, but not for this event -> show the reason
-    y = prv_add_text(L_MOVE_HINT, ui_move_reason(&s_event), FONT_SMALL, y + 2);
+    y = prv_add_text(L_MOVE_HINT, ui_action_reason(&s_event), FONT_SMALL, y + 2);
     text_layer_set_text_color(s_layers[L_MOVE_HINT], theme_muted());
   }
   scroll_layer_set_content_size(s_scroll, GSize(s_width, y + PAD));

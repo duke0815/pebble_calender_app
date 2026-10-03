@@ -58,7 +58,8 @@
       "MOVE_OPT",
       "MOVE_OK",
       "SET_MOVE_OPTS",
-      "SET_AUTO_CLOSE"
+      "SET_AUTO_CLOSE",
+      "RESP_OPT"
     ],
     "resources": {
       "media": [

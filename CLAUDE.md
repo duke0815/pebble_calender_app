@@ -30,7 +30,7 @@ src/c/idle.c/.h      Exit the app after a time without interaction
 src/c/ui_main.c/.h   Main window: date bar, status line + MenuLayer
 src/c/ui_detail.c/.h Event detail view
 src/c/ui_login.c/.h  Device code display
-src/c/ui_move.c/.h   Move event: options with target date, confirmation, result
+src/c/ui_action.c/.h Actions via Select in the details: move / respond menu, confirmation, result
 src/c/protocol.h     Shared constants (MSG_TYPE, STATUS_CODE, lengths)
 src/c/format.c/.h    Time/date formatting (DE/EN)
 src/c/i18n.c/.h      Watch texts (German/English), tr(STR_...)
@@ -61,7 +61,7 @@ Time calculations on the watch only via `time_make_local()` / `time_day_start()`
   - `POST https://login.microsoftonline.com/{AUTHORITY}/oauth2/v2.0/devicecode`
   - `POST https://login.microsoftonline.com/{AUTHORITY}/oauth2/v2.0/token` (poll at the given interval, `slow_down` → +5 s)
   - `AUTHORITY` as a constant: default `common`; for own use the own tenant ID can be entered.
-- Scopes: `https://graph.microsoft.com/Calendars.Read offline_access`; **only when "Allow moving" is on** `Calendars.ReadWrite offline_access` (incremental consent). `auth.rw` records whether the token response contained `Calendars.ReadWrite`; if it is missing while moving is on, the tokens are discarded and sign-in restarts (code on the watch). Refresh requests the scope the token has.
+- Scopes: `https://graph.microsoft.com/Calendars.Read offline_access`; **only when "Allow moving" or "Respond to invitations" is on** (`lib.needsWriteAccess`) `Calendars.ReadWrite offline_access` (incremental consent). `auth.rw` records whether the token response contained `Calendars.ReadWrite`; if it is missing while write access is needed, the tokens are discarded and sign-in restarts (code on the watch). Refresh requests the scope the token has.
 - The code is shown **on the watch**: "microsoft.com/devicelogin – Code: XXXXXX". Sign-in starts automatically on app start when there is no token. There is **no menu entry** for it; switching accounts = "Sign out" in the settings, then reopen the app. The app must stay open during sign-in (PebbleKit JS only runs while the watchapp runs).
 - Access token + refresh token + expiry in `localStorage` (PebbleKit JS). Refresh when less than 5 minutes remain.
 - `invalid_grant` / `interaction_required` → delete tokens, watch shows "Please reopen the app to sign in." (sign-in starts automatically on the next start).
@@ -106,6 +106,7 @@ The Clay config is built **dynamically** from the cached calendar list when open
 | Allow moving | Toggle (default **off**); on → write access, one-time new sign-in |
 | Moving allowed for | Select: `solo` = own events without attendees (default) / `own` = all own events (attendees get an update) |
 | Move options | Checkbox group: 1 hour / 1 day / 2 days / 1 week later / next Monday (default 1 day + 1 week, bitmask `moveOptions`) |
+| Respond to invitations | Toggle (default **off**, `respondEnabled`); on → write access (one-time new sign-in unless moving already has it) |
 | Sign out | Toggle → delete tokens |
 
 Clay fills `meta.activeWatchInfo` only on the `ready` event – for the instance created per opening, `index.js` sets it itself (otherwise the color picker only shows black/white). Do not use `capabilities` in the config (older Clay versions did not know newer platforms).
@@ -119,16 +120,17 @@ Send events **one by one** (message size limit), with a queue and ACK/NACK retry
 
 | Key | Type | Content |
 |---|---|---|
-| `MSG_TYPE` | int | Phone→watch: 1 = event, 2 = end of list, 3 = status/error, 4 = login code, 5 = settings, 6 = description, 7 = move result. Watch→phone: 10 = REQUEST (request data), 12 = request description, 13 = move |
+| `MSG_TYPE` | int | Phone→watch: 1 = event, 2 = end of list, 3 = status/error, 4 = login code, 5 = settings, 6 = description, 7 = action result (move or response). Watch→phone: 10 = REQUEST (request data), 12 = request description, 13 = move, 14 = respond |
 | `EVT_INDEX` / `EVT_COUNT` | int | Position / total (`EVT_COUNT` also with MSG_TYPE 2) |
 | `EVT_START` / `EVT_END` | int32 | Epoch seconds (all-day: local midnight, see above) |
 | `EVT_ALLDAY` | int | 0/1 |
 | `EVT_TITLE` | cstring | max. 80 chars **and** max. 95 bytes UTF-8, truncated in JS (`...`) |
 | `EVT_LOCATION` | cstring | max. 40 chars **and** max. 47 bytes UTF-8 |
 | `EVT_KEY` | int32 | Event key (with MSG_TYPE 1, 6, 12) |
-| `EVT_FLAGS` | int | with MSG_TYPE 1: bit 0 = movable, bit 1 = not organizer, bit 2 = has attendees, bit 3 = moving on at the phone (`lib.moveFlags`) |
+| `EVT_FLAGS` | int | with MSG_TYPE 1: bit 0 = movable, bit 1 = not organizer, bit 2 = has attendees, bit 3 = moving on at the phone, bit 4 = respondable, bits 5-6 = own response 0 none / 1 accepted / 2 tentative / 3 declined (`lib.eventFlags`) |
 | `MOVE_OPT` | int | with MSG_TYPE 13: 0 = +1 hour, 1 = +1 day, 2 = +2 days, 3 = +1 week, 4 = next Monday (same time; event on a Monday → Monday a week later) |
-| `MOVE_OK` | int | with MSG_TYPE 7: 1 = moved, 0 = error (text in `STATUS_TEXT`) |
+| `RESP_OPT` | int | with MSG_TYPE 14: 0 = accept, 1 = tentative, 2 = decline (`lib.RESPONSES`) |
+| `MOVE_OK` | int | with MSG_TYPE 7: 1 = done (moved/responded), 0 = error (text in `STATUS_TEXT`) |
 | `SET_MOVE_OPTS` | int | Bitmask of allowed options, 0 = moving off |
 | `NOTE_TEXT` | cstring | with MSG_TYPE 6: cleaned description (max. 400 bytes), empty = none |
 | `LIST_DAY` / `LIST_DAYS` | int | with MSG_TYPE 2: local midnight (epoch) of the first day / number of days (2 = cache, 1 = single day) |
@@ -181,9 +183,16 @@ Send events **one by one** (message size limit), with a queue and ACK/NACK retry
 - Only when enabled in the settings. Movable (`lib.isMovable`): `isOrganizer` and – with "Moving allowed for" = `solo` – no attendees (rooms count as attendees). Never invitations from others.
 - Attendees are counted without the organizer (`lib.countAttendees`: address = `organizer.emailAddress` or `status.response == 'organizer'` is ignored) – Outlook sometimes lists the organizer in `attendees`; otherwise nothing would be movable in `solo` mode (happened in practice).
 - `EVT_FLAGS` bits for diagnostics: 1 = movable, 2 = not organizer, 4 = has attendees, 8 = moving on at the phone. With moving on, the detail view shows why an event cannot be moved (gray), or "settings missing on the watch".
-- Watch: detail view shows "Select: Move" (accent color); Select → `ui_move`: list of the enabled options with target date/time (+1 hour not for all-day) → confirmation "Move to …?" (Select = yes, Back = no) → "Moving..." (timeout 12 s, send retry) → "Moved to …" + vibration, back to the day view after 1.5 s; errors stay visible (double vibration).
+- Watch: detail view shows "Select: Move" (accent color); Select → action menu (`ui_action`, section "Move"): list of the enabled options with target date/time (+1 hour not for all-day) → confirmation "Move to …?" (Select = yes, Back = no) → "Moving..." (timeout 12 s, send retry) → "Moved to …" + vibration, back to the day view after 1.5 s; errors stay visible (double vibration).
 - Phone: checks permission again (index `notes` stores id/start/end/allDay/movable), then `PATCH /me/events/{id}` with new start/end (UTC; days keep the local time, also across DST; all-day: date + `T00:00:00`, `timeZone: UTC`). Then `sync(true)`; the watch discards the day buffer and reloads the displayed day.
 - Recurring events: only the single occurrence is moved (Graph creates an exception).
+
+## Responding to invitations (opt-in)
+- Only when "Respond to invitations" is enabled. Respondable (`lib.isRespondable`): every event where the user is **not** the organizer. Own events are never respondable, invitations never movable – so the action menu has either the "Move" or the "Respond" section (the code supports both).
+- Own response from `responseStatus.response` → `EVT_FLAGS` bits 5-6. The detail view shows "Your response: Accepted" / "Not responded yet" and "Select: Respond".
+- Watch: Select → action menu section "Respond": Accept / Tentative / Decline ("Current response" as subtitle) → confirmation "Accept?\nThe organizer will be notified." → "Sending response..." → "Accepted" etc.; same timeouts/retry/close behavior as moving, result via MSG_TYPE 7.
+- Phone: checks permission again (`notes` index stores `respondable`), then `POST /me/events/{id}/{accept|tentativelyAccept|decline}` with `{"sendResponse": true}` (202). Then `sync(true)`; declined events disappear when "Hide declined events" is on.
+- Recurring events: only the single occurrence is answered.
 
 ## Daily briefing (Wakeup API)
 - `wakeup_schedule()` only ever for the **next** briefing time (respects weekdays); `wakeup_cancel_all()` first.
@@ -212,7 +221,7 @@ Positioning for publication: primarily personal accounts and small organizations
 
 ## Non-goals
 - No own server/proxy, no timeline pins.
-- No write access to the calendar – **only exception:** "Moving events" (opt-in, own events only, see "Moving events"). No creating, deleting, accepting/declining.
+- No write access to the calendar – **only exceptions:** "Moving events" (opt-in, own events only) and "Responding to invitations" (opt-in). No creating, deleting, editing titles.
 - No other calendar sources (Google, CalDAV) in version 1. Graph-specific code stays encapsulated in `index.js`/`lib.js` so other sources can be added later.
 
 ## Implementation order
@@ -225,6 +234,7 @@ Positioning for publication: primarily personal accounts and small organizations
 7. ✅ Daily briefing via wakeup
 8. ✅ Error states (first version) – fine-tuning after testing on real hardware
 9. ✅ Moving events, colors, English, auto close, flint, demo mode for screenshots
+10. ✅ Action menu on Select + responding to invitations (built with the SDK, **not yet tested on the watch**)
 
 Status: built by the owner with the real SDK and **tested in daily use on the Pebble Time 2** (display, touch, description, colors, language, moving own events with and without attendees work). The Claude environment can now reach `sdk.repebble.com` (allowed by the owner): `pebble sdk install latest`, `pebble build` and the emulator work there. One local fix is needed in a fresh container: the container has no IPv6, so pypkjs must bind IPv4 – in `pypkjs/runner/websocket.py` (pebble-tool's site-packages) replace `WSGIServer(("", self.port)` with `WSGIServer(("0.0.0.0", self.port)`; otherwise `pebble install --emulator` fails with "Connection refused".
 

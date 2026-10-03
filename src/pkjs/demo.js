@@ -1,10 +1,11 @@
 // Demo mode: a fake Microsoft Graph with neutral English sample events.
 // Used for store screenshots (index.js: DEMO = true, see tools/screenshots.sh).
-// No sign-in, no network. Moves are kept in memory until the app is closed.
+// No sign-in, no network. Moves and responses are kept in memory until the app is closed.
 
 var ME = { emailAddress: { name: 'Me', address: 'me@example.com' } };
 var CALENDAR_ID = 'demo-calendar';
 var moved = {};  // event id -> {start, end} (Graph dateTime strings)
+var responses = {};  // event id -> Graph response ('accepted', 'tentativelyAccepted', 'declined')
 
 function person(name) {
   return { emailAddress: { name: name, address: name.toLowerCase().replace(/[^a-z]/g, '') + '@example.com' } };
@@ -35,7 +36,7 @@ function dateOnly(day, plusDays) {
 }
 
 // t = [subject, start "HH:MM" or null (all-day), end "HH:MM", location, extra]
-// extra: {organizer: name (someone else), attendees: [names], notes: text}
+// extra: {organizer: name (someone else), attendees: [names], notes: text, response: Graph response (invitations)}
 function build(day, index, t) {
   var x = t[4] || {};
   var id = 'demo-' + dateOnly(day).slice(0, 10) + '-' + index;
@@ -64,7 +65,7 @@ function build(day, index, t) {
     location: { displayName: t[3] || '' },
     isCancelled: false,
     showAs: 'busy',
-    responseStatus: { response: mine ? 'organizer' : 'accepted' },
+    responseStatus: { response: mine ? 'organizer' : (responses[id] || x.response || 'accepted') },
     isOrganizer: mine,
     organizer: mine ? ME : person(x.organizer),
     attendees: attendees(x.attendees || [])
@@ -90,7 +91,8 @@ var TOMORROW = [
     notes: 'Review last week, set priorities for this week.' }],
   ['Supplier call', '11:00', '11:45', 'Microsoft Teams', { organizer: 'Robin Gray', attendees: ['Me'],
     notes: 'Delivery dates and pricing for next quarter.' + TEAMS }],
-  ['Design workshop', '14:00', '16:00', 'Studio B', { organizer: 'Jordan Kim', attendees: ['Me', 'Dana Fox'] }],
+  ['Design workshop', '14:00', '16:00', 'Studio B', { organizer: 'Jordan Kim', attendees: ['Me', 'Dana Fox'],
+    response: 'notResponded' }],
   ['Dinner with friends', '19:00', '21:00', "Luigi's Trattoria", {}]
 ];
 
@@ -174,6 +176,14 @@ function handle(method, url, body, now) {
     var start = Date.parse(query(url, 'startDateTime'));
     var end = Date.parse(query(url, 'endDateTime'));
     return [200, { value: eventsIn(start, end, now) }];
+  }
+  var resp = /^\/me\/events\/([^/]+)\/(accept|tentativelyAccept|decline)$/.exec(path);
+  if (resp && method === 'POST') {
+    var invite = findEvent(decodeURIComponent(resp[1]), now);
+    if (!invite) return [404, { error: { code: 'ErrorItemNotFound' } }];
+    if (invite.isOrganizer) return [400, { error: { code: 'ErrorInvalidRequest' } }];
+    responses[invite.id] = { accept: 'accepted', tentativelyAccept: 'tentativelyAccepted', decline: 'declined' }[resp[2]];
+    return [202, null];
   }
   var ev = /^\/me\/events\/([^/]+)$/.exec(path);
   if (ev) {

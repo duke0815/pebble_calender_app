@@ -9,7 +9,8 @@ typedef struct {
   void (*settings_changed)(void);
   void (*send_failed)(void);
   void (*note)(int32_t key, const char *text);
-  void (*move_result)(int32_t key, bool ok, const char *text);
+  // Result of a move or a response
+  void (*action_result)(int32_t key, bool ok, const char *text);
 } CommHandlers;
 
 void comm_init(CommHandlers handlers);
@@ -22,3 +23,5 @@ bool comm_request(time_t day);
 bool comm_request_note(int32_t key);
 // Move an event (opt = MOVE_OPT_*). false if it failed immediately.
 bool comm_request_move(int32_t key, int opt);
+// Respond to an invitation (opt = RESP_OPT_*). false if it failed immediately.
+bool comm_request_respond(int32_t key, int opt);

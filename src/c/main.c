@@ -7,7 +7,7 @@
 #include "ui_main.h"
 #include "ui_login.h"
 #include "ui_detail.h"
-#include "ui_move.h"
+#include "ui_action.h"
 #include "i18n.h"
 #include "idle.h"
 
@@ -276,10 +276,10 @@ static void prv_settings_changed(void) {
 
 static void prv_change_day(int delta);
 
-// Move result: shown in the move window; on success reload the day
-// (the phone reloads the cache after moving anyway).
-static void prv_move_result(int32_t key, bool ok, const char *text) {
-  ui_move_result(key, ok, text);
+// Move/response result: shown in the action window; on success reload the day
+// (the phone reloads the cache afterwards anyway).
+static void prv_action_result(int32_t key, bool ok, const char *text) {
+  ui_action_result(key, ok, text);
   if (ok) {
     events_invalidate_day();
     prv_change_day(0);
@@ -441,7 +441,7 @@ static void prv_init(void) {
     .settings_changed = prv_settings_changed,
     .send_failed = prv_send_failed,
     .note = prv_note,
-    .move_result = prv_move_result,
+    .action_result = prv_action_result,
   });
 
   ui_main_push((UiMainCallbacks) {

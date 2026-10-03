@@ -42,6 +42,7 @@ Open the app's settings in the Pebble app on your phone.
 | Colors | Accent, text and background color (color watches only) |
 | Daily briefing | Opens the app at a set time on chosen weekdays, vibrates and shows your day. Closes itself after 60 seconds without use. |
 | Allow moving | Lets you move your own events from the watch (see below) |
+| Respond to invitations | Lets you accept, tentatively accept or decline invitations from the watch (see below) |
 | Sign out | Deletes the sign-in on your phone |
 
 ## Moving events
@@ -51,6 +52,14 @@ Open the app's settings in the Pebble app on your phone.
 3. Open one of your events, press **Select**, pick an option and confirm with Select.
 
 Only events you organized can be moved. By default only events **without attendees** can be moved; under "Moving allowed for" you can allow all your own events – attendees then receive an update from Outlook. For a recurring event only that one occurrence is moved. If an event cannot be moved, the details say why.
+
+## Responding to invitations
+
+1. Turn on **Respond to invitations** in the settings.
+2. Reopen the app. If you have not allowed moving before, the watch shows a new sign-in code **once**, because the app now needs permission to change events.
+3. Open an invitation from someone else. The details show your current response. Press **Select**, choose **Accept**, **Tentative** or **Decline** and confirm with Select.
+
+The organizer receives your response. For a recurring event only that one occurrence is answered. Declined events disappear from the list if "Hide declined events" is on.
 
 ## Battery
 

@@ -31,12 +31,28 @@ global.Pebble = {
 };
 function fire(name, e) { (listeners[name] || []).forEach(function(fn) { fn(e || {}); }); }
 
+// Mock events lie on today's local date (the sync only fetches today + tomorrow)
+function localDay(offset) {
+  var d = new Date();
+  d.setDate(d.getDate() + (offset || 0));
+  return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' +
+         (d.getDate() < 10 ? '0' : '') + d.getDate();
+}
+var TODAY = localDay(0);
+var TOMORROW = localDay(1);
+
 var tokenPolls = 0;
 var requests = [];
 var lastScope = '';
 var patches = [];
+var posts = [];
+var withInvite = false;
 function respond(method, url, body) {
   requests.push(method + ' ' + url.split('?')[0]);
+  if (method === 'POST' && /graph\.microsoft\.com/.test(url)) {
+    posts.push({ url: url, body: JSON.parse(body) });
+    return [202, null];
+  }
   if (method === 'PATCH') {
     patches.push({ url: url, body: JSON.parse(body) });
     return [200, { id: 'evt-standup' }];
@@ -57,16 +73,19 @@ function respond(method, url, body) {
   if (/\/me\/calendars?(\/cal1)?\/calendarView/.test(url)) {
     return [200, {
       value: [{ id: 'evt-standup', bodyPreview: 'Bitte Status vorbereiten.', subject: 'Standup', isAllDay: false,
-                isOrganizer: true, attendees: [], start: { dateTime: '2026-10-01T07:00:00.0000000' },
-                end: { dateTime: '2026-10-01T07:15:00.0000000' }, location: { displayName: 'Teams' } }],
+                isOrganizer: true, attendees: [], start: { dateTime: TODAY + 'T07:00:00.0000000' },
+                end: { dateTime: TODAY + 'T07:15:00.0000000' }, location: { displayName: 'Teams' } }],
       '@odata.nextLink': 'https://graph.microsoft.com/v1.0/page2'
     }];
   }
   if (/page2$/.test(url)) {
-    return [200, { value: [
-      { subject: 'Abgesagt', isCancelled: true, start: { dateTime: '2026-10-01T09:00:00' }, end: { dateTime: '2026-10-01T10:00:00' } },
-      { subject: 'Feiertag', isAllDay: true, start: { dateTime: '2026-10-01T00:00:00' }, end: { dateTime: '2026-10-02T00:00:00' } }
-    ] }];
+    var invite = withInvite ? [{ id: 'evt-invite', subject: 'Einladung', isOrganizer: false, attendees: [{}],
+      responseStatus: { response: 'notResponded' },
+      start: { dateTime: TODAY + 'T12:00:00' }, end: { dateTime: TODAY + 'T13:00:00' } }] : [];
+    return [200, { value: invite.concat([
+      { subject: 'Abgesagt', isCancelled: true, start: { dateTime: TODAY + 'T09:00:00' }, end: { dateTime: TODAY + 'T10:00:00' } },
+      { subject: 'Feiertag', isAllDay: true, start: { dateTime: TODAY + 'T00:00:00' }, end: { dateTime: TOMORROW + 'T00:00:00' } }
+    ]) }];
   }
   if (/\/me\/calendars\?/.test(url)) {
     return [200, { value: [{ id: 'cal1', name: 'Kalender', isDefaultCalendar: true }] }];
@@ -140,8 +159,9 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
   var events = sent.filter(function(m) { return m.MSG_TYPE === 1; });
   assert.deepStrictEqual(events.map(function(e) { return e.EVT_TITLE; }), ['Feiertag', 'Standup']);
   assert.strictEqual(events[0].EVT_ALLDAY, 1);
-  assert.strictEqual(events[0].EVT_START, Math.floor(new Date(2026, 9, 1).getTime() / 1000));
-  assert.strictEqual(events[1].EVT_START, Date.UTC(2026, 9, 1, 7, 0) / 1000);
+  var now = new Date();
+  assert.strictEqual(events[0].EVT_START, Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000));
+  assert.strictEqual(events[1].EVT_START, Date.parse(TODAY + 'T07:00:00Z') / 1000);
   assert.strictEqual(events[1].EVT_LOCATION, 'Teams');
   var end = sent.filter(function(m) { return m.MSG_TYPE === 2; })[0];
   assert.strictEqual(end.EVT_COUNT, 2);
@@ -238,11 +258,52 @@ waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; });
                   assert.ok(denied && okRes, 'one success, one denial');
                   assert.strictEqual(patches.length, 1);
                   assert.ok(/\/me\/events\/evt-standup$/.test(patches[0].url));
+                  // +1 day keeps the local time of day
+                  function nextDayUtc(iso) {
+                    var d = new Date(iso);
+                    d.setDate(d.getDate() + 1);
+                    return d.toISOString().slice(0, 19);
+                  }
                   assert.deepStrictEqual(patches[0].body, {
-                    start: { dateTime: '2026-10-02T07:00:00', timeZone: 'UTC' },
-                    end: { dateTime: '2026-10-02T07:15:00', timeZone: 'UTC' }
+                    start: { dateTime: nextDayUtc(TODAY + 'T07:00:00Z'), timeZone: 'UTC' },
+                    end: { dateTime: nextDayUtc(TODAY + 'T07:15:00Z'), timeZone: 'UTC' }
                   });
-                  console.log('Simulation ok');
+                  assert.strictEqual(ev.EVT_FLAGS & 16, 0, 'own event is not respondable');
+
+                  // Enable responding (write access already there -> no new sign-in)
+                  withInvite = true;
+                  var polls2 = tokenPolls;
+                  global.openedUrl = null;
+                  fire('showConfiguration');
+                  waitFor(function() { return !!global.openedUrl; }, 1000, function() {
+                    sent = [];
+                    fire('webviewclosed', { response: encodeURIComponent(JSON.stringify({
+                      CFG_MOVE: { value: true }, CFG_RESPOND: { value: true }
+                    })) });
+                    waitFor(function() { return sent.some(function(m) { return m.MSG_TYPE === 2; }); }, 3000, function() {
+                      assert.strictEqual(tokenPolls, polls2, 'no new sign-in');
+                      var inv = sent.filter(function(m) { return m.MSG_TYPE === 1 && m.EVT_TITLE === 'Einladung'; })[0];
+                      assert.ok(inv, 'invitation sent');
+                      assert.strictEqual(inv.EVT_FLAGS & 16, 16, 'invitation is respondable');
+                      assert.strictEqual((inv.EVT_FLAGS >> 5) & 3, 0, 'not responded yet');
+                      assert.strictEqual(inv.EVT_FLAGS & 1, 0, 'invitation is not movable');
+                      // Decline the invitation; responding to an own event is denied
+                      sent = [];
+                      fire('appmessage', { payload: { MSG_TYPE: 14, EVT_KEY: inv.EVT_KEY, RESP_OPT: 2 } });
+                      fire('appmessage', { payload: { MSG_TYPE: 14, EVT_KEY: ev.EVT_KEY, RESP_OPT: 0 } });
+                      waitFor(function() { return sent.filter(function(m) { return m.MSG_TYPE === 7; }).length >= 2; }, 2000, function() {
+                        var res = sent.filter(function(m) { return m.MSG_TYPE === 7; });
+                        var okR = res.filter(function(r) { return r.MOVE_OK; })[0];
+                        var deniedR = res.filter(function(r) { return !r.MOVE_OK; })[0];
+                        assert.strictEqual(okR.EVT_KEY, inv.EVT_KEY);
+                        assert.strictEqual(deniedR.EVT_KEY, ev.EVT_KEY);
+                        assert.strictEqual(posts.length, 1);
+                        assert.ok(/\/me\/events\/evt-invite\/decline$/.test(posts[0].url));
+                        assert.deepStrictEqual(posts[0].body, { sendResponse: true });
+                        console.log('Simulation ok');
+                      });
+                    });
+                  });
                 });
               });
             });

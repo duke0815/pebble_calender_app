@@ -18,7 +18,7 @@ var AUTHORITY = 'common';
 var DEMO = false;
 
 var SCOPE_READ = 'https://graph.microsoft.com/Calendars.Read offline_access';
-// Only when "Move events" is enabled (incremental consent)
+// Only when moving or responding is enabled (incremental consent)
 var SCOPE_RW = 'https://graph.microsoft.com/Calendars.ReadWrite offline_access';
 var LOGIN_BASE = 'https://login.microsoftonline.com/' + AUTHORITY + '/oauth2/v2.0/';
 var GRAPH = 'https://graph.microsoft.com/v1.0';
@@ -60,6 +60,7 @@ function getSettings() {
     if (!load('settings', null)) {
       settings.moveEnabled = true;
       settings.moveOptions = 27;  // 1 hour, 1 day, 1 week, next Monday
+      settings.respondEnabled = true;
     }
   }
   applyLanguage(settings);
@@ -142,7 +143,7 @@ function rememberNotes(events) {
   events.forEach(function(e) {
     index[e.key] = {
       id: e.id, notes: e.notes, t: Date.now(),
-      start: e.start, end: e.end, allDay: e.allDay, movable: !!e.movable
+      start: e.start, end: e.end, allDay: e.allDay, movable: !!e.movable, respondable: !!e.respondable
     };
   });
   var keys = Object.keys(index);
@@ -219,6 +220,42 @@ function handleMove(key, opt) {
         sendMoveResult(key, false, i18n.t('noConnection'));
       } else {
         sendMoveResult(key, false, i18n.t('moveFailed') + ' (' + status + ')');
+      }
+    });
+  });
+}
+
+// --- Responding to invitations ---------------------------------------------
+// Result goes back like a move result (MSG_TYPE 7).
+
+function handleRespond(key, opt) {
+  var settings = getSettings();
+  var entry = load('notes', {})[key];
+  var action = lib.RESPONSES[opt];
+  // Check again - the watch may have stale data
+  if (!entry || !entry.respondable || !settings.respondEnabled || !action) {
+    sendMoveResult(key, false, i18n.t('respondDenied'));
+    return;
+  }
+  getToken(function(err, token) {
+    if (err) {
+      sendMoveResult(key, false, err.text);
+      return;
+    }
+    request('POST', GRAPH + '/me/events/' + encodeURIComponent(entry.id) + '/' + action, {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type': 'application/json',
+      'Prefer': 'outlook.timezone="UTC"'
+    }, JSON.stringify({ sendResponse: true }), function(status) {
+      if (status === 202 || status === 200) {
+        sendMoveResult(key, true, '');
+        sync(true);  // Reload the cache (declined events may disappear)
+      } else if (status === 403) {
+        sendMoveResult(key, false, i18n.t('respondDenied'));
+      } else if (status === 0) {
+        sendMoveResult(key, false, i18n.t('noConnection'));
+      } else {
+        sendMoveResult(key, false, i18n.t('respondFailed') + ' (' + status + ')');
       }
     });
   });
@@ -309,8 +346,8 @@ function getToken(callback) {
     return;
   }
   var auth = getAuth();
-  if (auth && getSettings().moveEnabled && !auth.rw) {
-    // Moving was enabled -> sign in again once to obtain write access
+  if (auth && lib.needsWriteAccess(getSettings()) && !auth.rw) {
+    // Moving/responding was enabled -> sign in again once to obtain write access
     clearAuth();
     auth = null;
   }
@@ -364,7 +401,7 @@ function startLogin(callback) {
     return;
   }
   login = { pending: true };
-  postForm(LOGIN_BASE + 'devicecode', { client_id: CLIENT_ID, scope: getSettings().moveEnabled ? SCOPE_RW : SCOPE_READ }, function(status, json) {
+  postForm(LOGIN_BASE + 'devicecode', { client_id: CLIENT_ID, scope: lib.needsWriteAccess(getSettings()) ? SCOPE_RW : SCOPE_READ }, function(status, json) {
     if (status !== 200 || !json || !json.device_code) {
       finishLogin(status === 0 ? { code: STATUS.NETWORK, text: i18n.t('noConnection') }
                                : lib.classifyAuthError(json));
@@ -581,7 +618,8 @@ function run() {
       }
       events.forEach(function(ev) {
         ev.movable = lib.isMovable(ev, settings);
-        ev.flags = lib.moveFlags(ev, settings);
+        ev.respondable = lib.isRespondable(ev, settings);
+        ev.flags = lib.eventFlags(ev, settings);
       });
       sendEvents(events, listDay, isCache ? lib.CACHE_DAYS : 1);
       done(null);
@@ -692,6 +730,8 @@ Pebble.addEventListener('appmessage', function(e) {
     handleNoteRequest(payloadValue(e.payload || {}, 'EVT_KEY'));
   } else if (type === MSG.MOVE) {
     handleMove(payloadValue(e.payload || {}, 'EVT_KEY'), payloadValue(e.payload || {}, 'MOVE_OPT'));
+  } else if (type === MSG.RESPOND) {
+    handleRespond(payloadValue(e.payload || {}, 'EVT_KEY'), payloadValue(e.payload || {}, 'RESP_OPT'));
   }
 });
 

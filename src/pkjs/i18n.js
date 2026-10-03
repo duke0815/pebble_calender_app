@@ -36,6 +36,13 @@ var STRINGS = {
     cfgMoveOwn: 'Alle eigenen Termine (Teilnehmer erhalten ein Update)',
     cfgMoveOptions: 'Möglichkeiten',
     moveOptionLabels: ['1 Stunde später', '1 Tag später', '2 Tage später', '1 Woche später', 'Nächster Montag'],
+    respondDenied: 'Auf diesen Termin kann nicht geantwortet werden.',
+    respondFailed: 'Antworten fehlgeschlagen',
+    cfgRespond: 'Einladungen',
+    cfgRespondEnable: 'Auf Einladungen antworten',
+    cfgRespondEnableDesc: 'In der Detailansicht mit Select: Zusagen, Mit Vorbehalt oder Absagen. Der Organisator ' +
+                          'erhält deine Antwort. Braucht Schreibrechte wie das Verschieben (einmalig neuer ' +
+                          'Anmelde-Code, falls noch nicht erteilt).',
     cfgLanguage: 'Sprache',
     cfgAutoClose: 'Automatisch schließen',
     cfgAutoCloseDesc: 'Beendet die App nach dieser Zeit ohne Bedienung und spart Akku (vor allem mit Touch). Nicht während der Anmeldung.',
@@ -97,6 +104,13 @@ var STRINGS = {
     cfgMoveOwn: 'All own events (attendees get an update)',
     cfgMoveOptions: 'Options',
     moveOptionLabels: ['1 hour later', '1 day later', '2 days later', '1 week later', 'Next Monday'],
+    respondDenied: 'You cannot respond to this event.',
+    respondFailed: 'Response failed',
+    cfgRespond: 'Invitations',
+    cfgRespondEnable: 'Respond to invitations',
+    cfgRespondEnableDesc: 'Press Select in the detail view: Accept, Tentative or Decline. The organizer gets ' +
+                          'your response. Needs write access like moving (a new sign-in code once, if not ' +
+                          'granted yet).',
     cfgLanguage: 'Language',
     cfgAutoClose: 'Close automatically',
     cfgAutoCloseDesc: 'Exits the app after this time without use to save battery (especially with touch). Not during sign-in.',

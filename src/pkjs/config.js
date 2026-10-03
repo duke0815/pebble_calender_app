@@ -150,6 +150,19 @@ function buildConfig(calendars, settings, loggedIn) {
     {
       type: 'section',
       items: [
+        { type: 'heading', defaultValue: t('cfgRespond') },
+        {
+          type: 'toggle',
+          messageKey: 'CFG_RESPOND',
+          label: t('cfgRespondEnable'),
+          description: t('cfgRespondEnableDesc'),
+          defaultValue: settings.respondEnabled
+        }
+      ]
+    },
+    {
+      type: 'section',
+      items: [
         { type: 'heading', defaultValue: t('cfgBriefing') },
         {
           type: 'toggle',
@@ -229,6 +242,7 @@ function applyResult(result, calendars, settings) {
     next.moveOptions = 0;
     moveOpts.forEach(function(on, i) { if (on) next.moveOptions |= 1 << i; });
   }
+  next.respondEnabled = !!value(result, 'CFG_RESPOND', next.respondEnabled);
   next.hideDeclined = !!value(result, 'CFG_HIDE_DECLINED', next.hideDeclined);
   next.briefEnabled = !!value(result, 'CFG_BRIEF', next.briefEnabled);
   var t = lib.parseTime(value(result, 'CFG_BRIEF_TIME', next.briefTime));

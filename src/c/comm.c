@@ -100,8 +100,8 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
     case MSG_MOVE_RESULT: {
       static char text[STATUS_LEN];
       prv_str(iter, MESSAGE_KEY_STATUS_TEXT, text, sizeof(text));
-      if (s_handlers.move_result) {
-        s_handlers.move_result(prv_int(iter, MESSAGE_KEY_EVT_KEY, 0),
+      if (s_handlers.action_result) {
+        s_handlers.action_result(prv_int(iter, MESSAGE_KEY_EVT_KEY, 0),
                                prv_int(iter, MESSAGE_KEY_MOVE_OK, 0) != 0, text);
       }
       break;
@@ -154,6 +154,17 @@ bool comm_request_move(int32_t key, int opt) {
   dict_write_int32(iter, MESSAGE_KEY_MSG_TYPE, MSG_MOVE);
   dict_write_int32(iter, MESSAGE_KEY_EVT_KEY, key);
   dict_write_int32(iter, MESSAGE_KEY_MOVE_OPT, opt);
+  return app_message_outbox_send() == APP_MSG_OK;
+}
+
+bool comm_request_respond(int32_t key, int opt) {
+  DictionaryIterator *iter;
+  if (app_message_outbox_begin(&iter) != APP_MSG_OK) {
+    return false;
+  }
+  dict_write_int32(iter, MESSAGE_KEY_MSG_TYPE, MSG_RESPOND);
+  dict_write_int32(iter, MESSAGE_KEY_EVT_KEY, key);
+  dict_write_int32(iter, MESSAGE_KEY_RESP_OPT, opt);
   return app_message_outbox_send() == APP_MSG_OK;
 }
 

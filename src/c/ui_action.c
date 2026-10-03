@@ -1,4 +1,4 @@
-#include "ui_move.h"
+#include "ui_action.h"
 #include "ui_detail.h"
 #include "comm.h"
 #include "format.h"
@@ -24,12 +24,26 @@
 static const StrId OPTION_LABELS[MOVE_OPT_COUNT] = {
   STR_MOVE_OPT_HOUR, STR_MOVE_OPT_DAY, STR_MOVE_OPT_2DAYS, STR_MOVE_OPT_WEEK, STR_MOVE_OPT_MONDAY
 };
+static const StrId RESP_LABELS[RESP_OPT_COUNT] = {
+  STR_RESP_ACCEPT, STR_RESP_TENTATIVE, STR_RESP_DECLINE
+};
+static const StrId RESPONDED_LABELS[RESP_OPT_COUNT] = {
+  STR_RESPONDED_ACCEPT, STR_RESPONDED_TENTATIVE, STR_RESPONDED_DECLINE
+};
+// RESPONSE_* (from EVT_FLAGS) of each response option
+static const int RESP_RESPONSE[RESP_OPT_COUNT] = {
+  RESPONSE_ACCEPTED, RESPONSE_TENTATIVE, RESPONSE_DECLINED
+};
+
+typedef enum { ACT_MOVE, ACT_RESPOND } ActionKind;
 
 static CalEvent s_event;
 static int s_options[MOVE_OPT_COUNT];
 static int s_option_count;
-static int s_chosen;
 static char s_targets[MOVE_OPT_COUNT][32];
+static bool s_respond;          // response options in the menu
+static ActionKind s_kind;       // chosen action
+static int s_chosen;            // MOVE_OPT_* or RESP_OPT_*
 
 // Selection
 static Window *s_menu_window;
@@ -81,7 +95,7 @@ static void prv_format_target(int opt, char *buf, size_t size) {
   }
 }
 
-bool ui_move_available(const CalEvent *event) {
+static bool prv_move_available(const CalEvent *event) {
   if (!(event->flags & EVT_FLAG_MOVABLE) || event->key == 0) return false;
   for (int opt = 0; opt < MOVE_OPT_COUNT; opt++) {
     if ((settings_get()->move_opts & (1 << opt)) && !(opt == MOVE_OPT_HOUR && event->all_day)) {
@@ -91,8 +105,35 @@ bool ui_move_available(const CalEvent *event) {
   return false;
 }
 
-const char *ui_move_reason(const CalEvent *event) {
-  if (ui_move_available(event)) return NULL;
+static bool prv_respond_available(const CalEvent *event) {
+  return (event->flags & EVT_FLAG_RESPONDABLE) && event->key != 0;
+}
+
+static int prv_response(const CalEvent *event) {
+  return (event->flags >> EVT_RESPONSE_SHIFT) & EVT_RESPONSE_MASK;
+}
+
+bool ui_action_available(const CalEvent *event) {
+  return prv_move_available(event) || prv_respond_available(event);
+}
+
+const char *ui_action_hint(const CalEvent *event) {
+  if (prv_move_available(event)) return tr(STR_MOVE_HINT);
+  if (prv_respond_available(event)) return tr(STR_RESPOND_HINT);
+  return NULL;
+}
+
+const char *ui_action_response_text(const CalEvent *event) {
+  static char text[48];
+  if (!prv_respond_available(event)) return NULL;
+  int response = prv_response(event);
+  if (response == RESPONSE_NONE) return tr(STR_RESPONSE_NONE);
+  snprintf(text, sizeof(text), tr(STR_RESPONSE_STATUS), tr(RESPONDED_LABELS[response - 1]));
+  return text;
+}
+
+const char *ui_action_reason(const CalEvent *event) {
+  if (ui_action_available(event)) return NULL;
   if (!(event->flags & EVT_FLAG_MOVE_ENABLED)) return NULL;  // feature off: no hint
   if (settings_get()->move_opts == 0) return tr(STR_MOVE_NO_SETTINGS);
   if (event->flags & EVT_FLAG_NOT_ORGANIZER) return tr(STR_MOVE_NOT_ORGANIZER);
@@ -133,7 +174,9 @@ static void prv_timeout(void *data) {
 static void prv_send(void *data) {
   s_send_timer = NULL;
   if (!s_sending) return;
-  if (comm_request_move(s_event.key, s_chosen)) return;
+  bool sent = s_kind == ACT_MOVE ? comm_request_move(s_event.key, s_chosen)
+                                 : comm_request_respond(s_event.key, s_chosen);
+  if (sent) return;
   if (++s_tries < SEND_TRIES) {
     s_send_timer = app_timer_register(SEND_RETRY_MS, prv_send, NULL);
   }
@@ -149,7 +192,7 @@ static void prv_confirm_select(ClickRecognizerRef recognizer, void *context) {
   }
   s_sending = true;
   s_tries = 0;
-  prv_set_text(tr(STR_MOVING), "");
+  prv_set_text(tr(s_kind == ACT_MOVE ? STR_MOVING : STR_RESPONDING), "");
   s_timeout = app_timer_register(RESULT_TIMEOUT_MS, prv_timeout, NULL);
   prv_send(NULL);
 }
@@ -199,11 +242,16 @@ static void prv_confirm_unload(Window *window) {
   s_confirm_window = NULL;
 }
 
-static void prv_show_confirm(int opt) {
+static void prv_show_confirm(ActionKind kind, int opt) {
+  s_kind = kind;
   s_chosen = opt;
   s_sending = false;
   s_done = false;
-  snprintf(s_text, sizeof(s_text), tr(STR_MOVE_CONFIRM), s_targets[opt]);
+  if (kind == ACT_MOVE) {
+    snprintf(s_text, sizeof(s_text), tr(STR_MOVE_CONFIRM), s_targets[opt]);
+  } else {
+    snprintf(s_text, sizeof(s_text), tr(STR_RESP_CONFIRM), tr(RESP_LABELS[opt]));
+  }
   s_confirm_window = window_create();
   window_set_background_color(s_confirm_window, theme_bg());
   window_set_click_config_provider(s_confirm_window, prv_confirm_click_config);
@@ -214,28 +262,40 @@ static void prv_show_confirm(int opt) {
   window_stack_push(s_confirm_window, true);
 }
 
-void ui_move_result(int32_t key, bool ok, const char *text) {
+void ui_action_result(int32_t key, bool ok, const char *text) {
   if (!s_confirm_window || !s_sending || key != s_event.key) return;
   prv_cancel_timers();
   s_sending = false;
   s_done = true;
   if (ok) {
     char msg[96];
-    snprintf(msg, sizeof(msg), tr(STR_MOVED), s_targets[s_chosen]);
+    if (s_kind == ACT_MOVE) {
+      snprintf(msg, sizeof(msg), tr(STR_MOVED), s_targets[s_chosen]);
+    } else {
+      snprintf(msg, sizeof(msg), "%s", tr(RESPONDED_LABELS[s_chosen]));
+    }
     prv_set_text(msg, "");
     vibes_short_pulse();
     s_close_timer = app_timer_register(CLOSE_AFTER_MS, prv_close_all, NULL);
   } else {
-    prv_set_text(text[0] ? text : tr(STR_MOVE_FAILED), "");
+    prv_set_text(text[0] ? text : tr(s_kind == ACT_MOVE ? STR_MOVE_FAILED : STR_RESPOND_FAILED), "");
     vibes_double_pulse();
   }
 }
 
 // ---------------------------------------------------------------------------
-// Selection
+// Menu: one section per action kind (move options, responses)
+
+static ActionKind prv_section_kind(uint16_t section) {
+  return (section == 0 && s_option_count > 0) ? ACT_MOVE : ACT_RESPOND;
+}
+
+static uint16_t prv_num_sections(MenuLayer *menu, void *ctx) {
+  return (s_option_count > 0 ? 1 : 0) + (s_respond ? 1 : 0);
+}
 
 static uint16_t prv_num_rows(MenuLayer *menu, uint16_t section, void *ctx) {
-  return s_option_count;
+  return prv_section_kind(section) == ACT_MOVE ? s_option_count : RESP_OPT_COUNT;
 }
 
 static int16_t prv_header_height(MenuLayer *menu, uint16_t section, void *ctx) {
@@ -243,12 +303,18 @@ static int16_t prv_header_height(MenuLayer *menu, uint16_t section, void *ctx) {
 }
 
 static void prv_draw_header(GContext *ctx, const Layer *cell, uint16_t section, void *data) {
-  menu_cell_basic_header_draw(ctx, cell, tr(STR_MOVE_TITLE));
+  menu_cell_basic_header_draw(ctx, cell,
+                              tr(prv_section_kind(section) == ACT_MOVE ? STR_MOVE_TITLE : STR_RESPOND_TITLE));
 }
 
 static void prv_draw_row(GContext *ctx, const Layer *cell, MenuIndex *index, void *data) {
-  int opt = s_options[index->row];
-  menu_cell_basic_draw(ctx, cell, tr(OPTION_LABELS[opt]), s_targets[opt], NULL);
+  if (prv_section_kind(index->section) == ACT_MOVE) {
+    int opt = s_options[index->row];
+    menu_cell_basic_draw(ctx, cell, tr(OPTION_LABELS[opt]), s_targets[opt], NULL);
+  } else {
+    bool current = RESP_RESPONSE[index->row] == prv_response(&s_event);
+    menu_cell_basic_draw(ctx, cell, tr(RESP_LABELS[index->row]), current ? tr(STR_RESP_CURRENT) : NULL, NULL);
+  }
 }
 
 static void prv_selection_changed(MenuLayer *menu, MenuIndex new_index, MenuIndex old_index, void *data) {
@@ -257,13 +323,18 @@ static void prv_selection_changed(MenuLayer *menu, MenuIndex new_index, MenuInde
 
 static void prv_select(MenuLayer *menu, MenuIndex *index, void *data) {
   idle_kick();
-  prv_show_confirm(s_options[index->row]);
+  if (prv_section_kind(index->section) == ACT_MOVE) {
+    prv_show_confirm(ACT_MOVE, s_options[index->row]);
+  } else {
+    prv_show_confirm(ACT_RESPOND, index->row);
+  }
 }
 
 static void prv_menu_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   s_menu = menu_layer_create(layer_get_bounds(root));
   menu_layer_set_callbacks(s_menu, NULL, (MenuLayerCallbacks) {
+    .get_num_sections = prv_num_sections,
     .get_num_rows = prv_num_rows,
     .get_header_height = prv_header_height,
     .draw_header = prv_draw_header,
@@ -284,11 +355,12 @@ static void prv_menu_unload(Window *window) {
   s_menu_window = NULL;
 }
 
-void ui_move_show(const CalEvent *event) {
-  if (s_menu_window || !ui_move_available(event)) return;
+void ui_action_show(const CalEvent *event) {
+  if (s_menu_window || !ui_action_available(event)) return;
   s_event = *event;
   s_option_count = 0;
-  for (int opt = 0; opt < MOVE_OPT_COUNT; opt++) {
+  s_respond = prv_respond_available(event);
+  for (int opt = 0; opt < MOVE_OPT_COUNT && prv_move_available(event); opt++) {
     if (prv_option_fits(opt)) {
       s_options[s_option_count++] = opt;
       prv_format_target(opt, s_targets[opt], sizeof(s_targets[opt]));

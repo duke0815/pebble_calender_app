@@ -259,9 +259,9 @@ test('Moving: permission, times, Graph body', function() {
     start: { dateTime: '2026-10-02T00:00:00', timeZone: 'UTC' },
     end: { dateTime: '2026-10-03T00:00:00', timeZone: 'UTC' }
   });
-  assert.strictEqual(lib.moveFlags(solo, on), 1 | 8);
-  assert.strictEqual(lib.moveFlags({ isOrganizer: false, attendees: 2 }, on), 2 | 4 | 8);
-  assert.strictEqual(lib.moveFlags(solo, lib.mergeSettings({})), 0);
+  assert.strictEqual(lib.eventFlags(solo, on), 1 | 8);
+  assert.strictEqual(lib.eventFlags({ isOrganizer: false, attendees: 2 }, on), 2 | 4 | 8);
+  assert.strictEqual(lib.eventFlags(solo, lib.mergeSettings({})), 0);
   var n = lib.normalizeEvent({ id: 'a', isOrganizer: true, attendees: [{}, {}], start: { dateTime: '2026-10-01T07:00:00' },
                                end: { dateTime: '2026-10-01T08:00:00' } });
   assert.strictEqual(n.attendees, 2);
@@ -282,6 +282,31 @@ test('Moving: permission, times, Graph body', function() {
   assert.strictEqual(applied.settings.moveEnabled, true);
   assert.strictEqual(applied.settings.moveScope, 'own');
   assert.strictEqual(applied.settings.moveOptions, 9);
+});
+
+test('Responding to invitations: permission, flags, settings', function() {
+  var on = lib.mergeSettings({ respondEnabled: true });
+  var invite = lib.normalizeEvent({ id: 'i', isOrganizer: false, responseStatus: { response: 'tentativelyAccepted' },
+    attendees: [{}], start: { dateTime: '2026-10-01T07:00:00' }, end: { dateTime: '2026-10-01T08:00:00' } });
+  assert.strictEqual(invite.response, 2);
+  assert.strictEqual(lib.isRespondable(invite, on), true);
+  assert.strictEqual(lib.isRespondable(invite, lib.mergeSettings({})), false, 'off = never');
+  assert.strictEqual(lib.isRespondable({ isOrganizer: true }, on), false, 'own events cannot be answered');
+  // bit 4 respondable, bits 5-6 response; moving off -> no bit 3
+  assert.strictEqual(lib.eventFlags(invite, on), 2 | 4 | 16 | (2 << 5));
+  assert.strictEqual(lib.eventFlags(invite, lib.mergeSettings({})), 2 | 4 | (2 << 5));
+  var none = lib.normalizeEvent({ id: 'j', responseStatus: { response: 'notResponded' },
+    start: { dateTime: '2026-10-01T07:00:00' }, end: { dateTime: '2026-10-01T08:00:00' } });
+  assert.strictEqual(none.response, 0);
+  assert.strictEqual(lib.normalizeEvent({ id: 'k', responseStatus: { response: 'declined' },
+    start: { dateTime: '2026-10-01T07:00:00' }, end: { dateTime: '2026-10-01T08:00:00' } }).response, 3);
+  assert.deepStrictEqual(lib.RESPONSES, ['accept', 'tentativelyAccept', 'decline']);
+  assert.strictEqual(lib.needsWriteAccess(lib.mergeSettings({})), false);
+  assert.strictEqual(lib.needsWriteAccess(on), true);
+  assert.strictEqual(lib.needsWriteAccess(lib.mergeSettings({ moveEnabled: true })), true);
+  var applied = config.applyResult({ CFG_RESPOND: { value: true } }, [], lib.mergeSettings({}));
+  assert.strictEqual(applied.settings.respondEnabled, true);
+  assert.strictEqual(config.applyResult({}, [], lib.mergeSettings({})).settings.respondEnabled, false);
 });
 
 test('demo: sample events run through the normal pipeline', function() {
@@ -317,6 +342,17 @@ test('demo: sample events run through the normal pipeline', function() {
   });
   assert.strictEqual(after.length, 1);
   assert.strictEqual(after[0].start, local(2026, 10, 2, 15, 0));
+  // Responding: invitations only, the new response shows up in the list
+  var workshop = events.filter(function(e) { return e.title === 'Design workshop'; })[0];
+  assert.strictEqual(workshop.response, 0);
+  var respUrl = 'https://graph.microsoft.com/v1.0/me/events/' + encodeURIComponent(workshop.id) + '/tentativelyAccept';
+  assert.strictEqual(demo.handle('POST', respUrl, '{"sendResponse":true}', now)[0], 202);
+  var ownUrl = 'https://graph.microsoft.com/v1.0/me/events/' + encodeURIComponent(dentist.id) + '/accept';
+  assert.strictEqual(demo.handle('POST', ownUrl, '{"sendResponse":true}', now)[0], 400);
+  var answered = demo.handle('GET', url, null, now)[1].value.map(lib.normalizeEvent).filter(function(e) {
+    return e.title === 'Design workshop';
+  })[0];
+  assert.strictEqual(answered.response, 2);
   // Other days and weekends have events too, other calendars are empty
   var sat = lib.queryWindow(new Date(2026, 9, 3), 1);
   var satUrl = 'https://graph.microsoft.com/v1.0/me/calendar/calendarView?startDateTime=' +

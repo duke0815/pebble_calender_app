@@ -9,17 +9,33 @@
 #define MSG_LOGIN_CODE   4
 #define MSG_SETTINGS     5
 #define MSG_NOTE         6
-#define MSG_MOVE_RESULT  7
+#define MSG_MOVE_RESULT  7   // result of a move or a response (MOVE_OK + STATUS_TEXT)
 // MSG_TYPE: watch -> phone
 #define MSG_REQUEST      10
 #define MSG_NOTE_REQUEST 12
 #define MSG_MOVE         13
+#define MSG_RESPOND      14
 
 // EVT_FLAGS
 #define EVT_FLAG_MOVABLE       1
 #define EVT_FLAG_NOT_ORGANIZER 2   // invitation from someone else
 #define EVT_FLAG_HAS_ATTENDEES 4
 #define EVT_FLAG_MOVE_ENABLED  8   // moving is enabled on the phone
+#define EVT_FLAG_RESPONDABLE   16  // invitation that may be answered
+#define EVT_RESPONSE_SHIFT     5   // bits 5-6: own response (RESPONSE_*)
+#define EVT_RESPONSE_MASK      3
+
+// Own response to an invitation (from EVT_FLAGS)
+#define RESPONSE_NONE      0
+#define RESPONSE_ACCEPTED  1
+#define RESPONSE_TENTATIVE 2
+#define RESPONSE_DECLINED  3
+
+// Response options (RESP_OPT with MSG_RESPOND) - same as RESPONSES in lib.js
+#define RESP_OPT_ACCEPT    0
+#define RESP_OPT_TENTATIVE 1
+#define RESP_OPT_DECLINE   2
+#define RESP_OPT_COUNT     3
 
 // Move options (MOVE_OPT, bits in SET_MOVE_OPTS) - same as MOVE_OPTIONS in lib.js
 #define MOVE_OPT_HOUR  0

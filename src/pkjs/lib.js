@@ -13,7 +13,8 @@ var MSG = {
   MOVE_RESULT: 7,
   REQUEST: 10,
   NOTE_REQUEST: 12,
-  MOVE: 13
+  MOVE: 13,
+  RESPOND: 14
 };
 
 // Move options: index = MOVE_OPT in the protocol = bit in settings.moveOptions
@@ -24,6 +25,14 @@ var MOVE_OPTIONS = [
   { days: 7 },    // 3: 1 week later
   { weekday: 1 }  // 4: next Monday (if the event is on a Monday: Monday a week later)
 ];
+
+// Responses to invitations: index = RESP_OPT in the protocol, value = Graph action
+// (POST /me/events/{id}/{action})
+var RESPONSES = ['accept', 'tentativelyAccept', 'decline'];
+
+// Own response to an event for the watch (EVT_FLAGS bits 5-6):
+// 0 = none/not responded, 1 = accepted, 2 = tentative, 3 = declined
+var RESPONSE_CODES = { accepted: 1, tentativelyAccepted: 2, declined: 3 };
 
 // Days until the next weekday wday (0 = Sunday) after the event's date, 1..7
 function daysUntilWeekday(sec, wday) {
@@ -66,6 +75,7 @@ var DEFAULT_SETTINGS = {
   moveEnabled: false,         // move events (requires Calendars.ReadWrite)
   moveScope: 'solo',          // 'solo' = own events without attendees, 'own' = all own events
   moveOptions: 10,            // bitmask over MOVE_OPTIONS; default: 1 day + 1 week
+  respondEnabled: false,      // accept/decline invitations (requires Calendars.ReadWrite)
   accentColor: 0x0055AA,      // 0xRRGGBB (Pebble palette)
   textColor: 0x000000,
   bgColor: 0xFFFFFF
@@ -268,6 +278,7 @@ function normalizeEvent(e) {
     location: truncate((e.location && e.location.displayName) || '', LOCATION_CHARS, LOCATION_BYTES),
     declined: !!(e.responseStatus && e.responseStatus.response === 'declined'),
     isOrganizer: !!e.isOrganizer,
+    response: RESPONSE_CODES[e.responseStatus && e.responseStatus.response] || 0,
     attendees: countAttendees(e)
   };
 }
@@ -282,14 +293,27 @@ function isMovable(e, settings) {
   return settings.moveScope === 'own' || !e.attendees;
 }
 
+// Invitations from others (not organizer) can be answered when enabled.
+function isRespondable(e, settings) {
+  return !!(e && settings.respondEnabled && !e.isOrganizer);
+}
+
+// Moving or responding needs Calendars.ReadWrite
+function needsWriteAccess(settings) {
+  return !!(settings.moveEnabled || settings.respondEnabled);
+}
+
 // EVT_FLAGS for the watch: bit 0 movable; reasons why not (for the hint in the
-// detail view): bit 1 = not organizer, bit 2 = has attendees, bit 3 = moving enabled on the phone
-function moveFlags(e, settings) {
+// detail view): bit 1 = not organizer, bit 2 = has attendees, bit 3 = moving enabled on the phone;
+// bit 4 = respondable, bits 5-6 = own response (RESPONSE_CODES)
+function eventFlags(e, settings) {
   var flags = 0;
   if (isMovable(e, settings)) flags |= 1;
   if (!e.isOrganizer) flags |= 2;
   if (e.attendees) flags |= 4;
   if (settings.moveEnabled) flags |= 8;
+  if (isRespondable(e, settings)) flags |= 16;
+  flags |= ((e.response || 0) & 3) << 5;
   return flags;
 }
 
@@ -447,7 +471,10 @@ module.exports = {
   normalizeEvent: normalizeEvent,
   MOVE_OPTIONS: MOVE_OPTIONS,
   isMovable: isMovable,
-  moveFlags: moveFlags,
+  RESPONSES: RESPONSES,
+  isRespondable: isRespondable,
+  needsWriteAccess: needsWriteAccess,
+  eventFlags: eventFlags,
   shiftEvent: shiftEvent,
   graphMoveBody: graphMoveBody,
   eventKey: eventKey,
