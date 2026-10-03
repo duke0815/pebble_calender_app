@@ -235,9 +235,9 @@ Positioning for publication: primarily personal accounts and small organizations
 7. ✅ Daily briefing via wakeup
 8. ✅ Error states (first version) – fine-tuning after testing on real hardware
 9. ✅ Moving events, colors, English, auto close, flint, demo mode for screenshots
-10. ✅ Action menu on Select + responding to invitations (built with the SDK, **not yet tested on the watch**)
+10. ✅ Action menu on Select + responding to invitations (tested on the Pebble Time 2 with an external invitation)
 
-Status: built by the owner with the real SDK and **tested in daily use on the Pebble Time 2** (display, touch, description, colors, language, moving own events with and without attendees work). The Claude environment can now reach `sdk.repebble.com` (allowed by the owner): `pebble sdk install latest`, `pebble build` and the emulator work there. One local fix is needed in a fresh container: the container has no IPv6, so pypkjs must bind IPv4 – in `pypkjs/runner/websocket.py` (pebble-tool's site-packages) replace `WSGIServer(("", self.port)` with `WSGIServer(("0.0.0.0", self.port)`; otherwise `pebble install --emulator` fails with "Connection refused".
+Status: built by the owner with the real SDK and **tested in daily use on the Pebble Time 2** (display, touch, description, colors, language, moving own events with and without attendees, responding to invitations work). The Claude environment can now reach `sdk.repebble.com` (allowed by the owner): `pebble sdk install latest`, `pebble build` and the emulator work there. One local fix is needed in a fresh container: the container has no IPv6, so pypkjs must bind IPv4 – in `pypkjs/runner/websocket.py` (pebble-tool's site-packages) replace `WSGIServer(("", self.port)` with `WSGIServer(("0.0.0.0", self.port)`; otherwise `pebble install --emulator` fails with "Connection refused".
 
 ## Before the store release
 - Publisher verification in Entra ID (Microsoft partner ID) – a precondition for users in other tenants to consent themselves at all.
